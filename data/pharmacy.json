@@ -1,0 +1,254 @@
+{
+  "pharmacyInfo": {
+    "name": "Nhà Thuốc Pharmacy Pro",
+    "address": "123 Đường ABC, Quận 1, TP.HCM",
+    "phone": "0901234567",
+    "email": "contact@pharmacypro.vn",
+    "taxCode": "0123456789",
+    "logo": "",
+    "operatingLicense": "GPP-123456"
+  },
+  "categories": [
+    { "id": "cat_1", "name": "Kháng sinh", "icon": "💊" },
+    { "id": "cat_2", "name": "Vitamin & Khoáng chất", "icon": "🍊" },
+    { "id": "cat_3", "name": "Giảm đau - Hạ sốt", "icon": "🌡️" },
+    { "id": "cat_4", "name": "Tiêu hóa", "icon": "🫀" },
+    { "id": "cat_5", "name": "Da liễu", "icon": "🧴" },
+    { "id": "cat_6", "name": "Tim mạch", "icon": "❤️" },
+    { "id": "cat_7", "name": "Hô hấp", "icon": "🫁" }
+  ],
+  "units": [
+    { "id": "unit_1", "name": "Viên", "shortName": "viên" },
+    { "id": "unit_2", "name": "Vỉ", "shortName": "vỉ" },
+    { "id": "unit_3", "name": "Hộp", "shortName": "hộp" },
+    { "id": "unit_4", "name": "Lọ", "shortName": "lọ" },
+    { "id": "unit_5", "name": "Tuýp", "shortName": "tuýp" },
+    { "id": "unit_6", "name": "Chai", "shortName": "chai" }
+  ],
+  "medicines": [
+    {
+      "id": "med_1",
+      "name": "Panadol Extra",
+      "activeIngredient": "Paracetamol 500mg + Caffeine 65mg",
+      "category": "cat_3",
+      "unit": "unit_2",
+      "manufacturer": "GlaxoSmithKline",
+      "country": "Anh",
+      "registrationNumber": "VN-12345-16",
+      "description": "Thuốc giảm đau, hạ sốt",
+      "usage": "Uống sau ăn",
+      "dosage": "1-2 viên/lần, 3-4 lần/ngày",
+      "barcode": "8934588012345",
+      "minStock": 10,
+      "batches": [
+        {
+          "id": "batch_1",
+          "batchNumber": "L001-23",
+          "expiryDate": "2024-06-15T00:00:00Z",
+          "quantity": 25,
+          "costPrice": 15000,
+          "sellingPrice": 22000,
+          "supplierId": "sup_1",
+          "importDate": "2024-01-10T00:00:00Z",
+          "location": "Kệ A1"
+        }
+      ],
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-10T00:00:00Z"
+    },
+    {
+      "id": "med_2",
+      "name": "Efferalgan 500mg",
+      "activeIngredient": "Paracetamol 500mg",
+      "category": "cat_3",
+      "unit": "unit_3",
+      "manufacturer": "Bristol-Myers Squibb",
+      "country": "Pháp",
+      "registrationNumber": "VN-23456-18",
+      "description": "Thuốc giảm đau, hạ sốt hiệu quả",
+      "usage": "Uống trước hoặc sau ăn",
+      "dosage": "1-2 viên/lần, mỗi 4-6 giờ",
+      "barcode": "8934588023456",
+      "minStock": 10,
+      "batches": [
+        {
+          "id": "batch_2",
+          "batchNumber": "E220-11",
+          "expiryDate": "2025-12-30T00:00:00Z",
+          "quantity": 2,
+          "costPrice": 18000,
+          "sellingPrice": 28000,
+          "supplierId": "sup_1",
+          "importDate": "2024-02-05T00:00:00Z",
+          "location": "Kệ A2"
+        }
+      ],
+      "createdAt": "2024-01-05T00:00:00Z",
+      "updatedAt": "2024-02-05T00:00:00Z"
+    },
+    {
+      "id": "med_3",
+      "name": "Berberin 10mg",
+      "activeIngredient": "Berberin HCl 10mg",
+      "category": "cat_4",
+      "unit": "unit_4",
+      "manufacturer": "Pymepharco",
+      "country": "Việt Nam",
+      "registrationNumber": "VN-34567-19",
+      "description": "Thuốc trị tiêu chảy",
+      "usage": "Uống sau ăn",
+      "dosage": "2-3 viên/lần, 3 lần/ngày",
+      "barcode": "8934588034567",
+      "minStock": 5,
+      "batches": [
+        {
+          "id": "batch_3",
+          "batchNumber": "B992-01",
+          "expiryDate": "2024-06-20T00:00:00Z",
+          "quantity": 15,
+          "costPrice": 35000,
+          "sellingPrice": 52000,
+          "supplierId": "sup_2",
+          "importDate": "2023-12-20T00:00:00Z",
+          "location": "Kệ B1"
+        }
+      ],
+      "createdAt": "2023-12-15T00:00:00Z",
+      "updatedAt": "2023-12-20T00:00:00Z"
+    },
+    {
+      "id": "med_4",
+      "name": "Vitamin C 500mg",
+      "activeIngredient": "Acid ascorbic 500mg",
+      "category": "cat_2",
+      "unit": "unit_2",
+      "manufacturer": "DHG Pharma",
+      "country": "Việt Nam",
+      "registrationNumber": "VN-45678-20",
+      "description": "Bổ sung vitamin C",
+      "usage": "Uống sau ăn",
+      "dosage": "1 viên/ngày",
+      "barcode": "8934588045678",
+      "minStock": 20,
+      "batches": [
+        {
+          "id": "batch_4",
+          "batchNumber": "V500-88",
+          "expiryDate": "2025-10-15T00:00:00Z",
+          "quantity": 5,
+          "costPrice": 8000,
+          "sellingPrice": 12000,
+          "supplierId": "sup_2",
+          "importDate": "2024-03-01T00:00:00Z",
+          "location": "Kệ C1"
+        }
+      ],
+      "createdAt": "2024-02-20T00:00:00Z",
+      "updatedAt": "2024-03-01T00:00:00Z"
+    }
+  ],
+  "suppliers": [
+    {
+      "id": "sup_1",
+      "code": "NCC001",
+      "name": "Công ty TNHH Dược phẩm ABC",
+      "phone": "0287654321",
+      "email": "abc@supplier.vn",
+      "address": "456 Đường XYZ, Quận 3, TP.HCM",
+      "taxCode": "0987654321",
+      "contactPerson": "Nguyễn Văn B",
+      "debt": 0,
+      "createdAt": "2023-12-01T00:00:00Z"
+    },
+    {
+      "id": "sup_2",
+      "code": "NCC002",
+      "name": "Công ty CP Dược Phẩm XYZ",
+      "phone": "0281234567",
+      "email": "xyz@supplier.vn",
+      "address": "789 Đường DEF, Quận 5, TP.HCM",
+      "taxCode": "0123987654",
+      "contactPerson": "Trần Thị C",
+      "debt": 5000000,
+      "createdAt": "2023-11-15T00:00:00Z"
+    }
+  ],
+  "customers": [
+    {
+      "id": "cus_1",
+      "code": "KH001",
+      "name": "Lê Văn D",
+      "phone": "0909123456",
+      "email": "levand@email.com",
+      "address": "12 Đường GHI, Quận 7, TP.HCM",
+      "dateOfBirth": "1985-05-15T00:00:00Z",
+      "gender": "male",
+      "loyaltyPoints": 150,
+      "totalPurchases": 3500000,
+      "lastPurchaseDate": "2024-05-20T00:00:00Z",
+      "createdAt": "2023-10-10T00:00:00Z",
+      "updatedAt": "2024-05-20T00:00:00Z"
+    },
+    {
+      "id": "cus_2",
+      "code": "KH002",
+      "name": "Phạm Thị E",
+      "phone": "0912345678",
+      "address": "34 Đường JKL, Quận 10, TP.HCM",
+      "dateOfBirth": "1990-08-22T00:00:00Z",
+      "gender": "female",
+      "loyaltyPoints": 250,
+      "totalPurchases": 5200000,
+      "lastPurchaseDate": "2024-05-25T00:00:00Z",
+      "createdAt": "2023-09-05T00:00:00Z",
+      "updatedAt": "2024-05-25T00:00:00Z"
+    }
+  ],
+  "invoices": [
+    {
+      "id": "inv_1",
+      "code": "HD0001",
+      "type": "retail",
+      "customerId": "cus_1",
+      "customerName": "Lê Văn D",
+      "customerPhone": "0909123456",
+      "items": [
+        {
+          "medicineId": "med_1",
+          "medicineName": "Panadol Extra",
+          "batchId": "batch_1",
+          "batchNumber": "L001-23",
+          "quantity": 2,
+          "unitPrice": 22000,
+          "discount": 0,
+          "total": 44000
+        }
+      ],
+      "subtotal": 44000,
+      "discount": 0,
+      "discountAmount": 0,
+      "total": 44000,
+      "paid": 50000,
+      "change": 6000,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "cashierId": "staff_1",
+      "cashierName": "Nguyễn Văn A",
+      "createdAt": "2024-05-20T10:30:00Z",
+      "updatedAt": "2024-05-20T10:30:00Z"
+    }
+  ],
+  "staff": [
+    {
+      "id": "staff_1",
+      "code": "NV001",
+      "name": "Nguyễn Văn A",
+      "phone": "0901234567",
+      "email": "nguyenvana@pharmacy.vn",
+      "role": "admin",
+      "username": "admin",
+      "avatar": "",
+      "createdAt": "2023-01-01T00:00:00Z"
+    }
+  ]
+}
