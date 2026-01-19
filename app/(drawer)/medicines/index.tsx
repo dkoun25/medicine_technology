@@ -1,391 +1,313 @@
-import { Header } from '@/components/layout/Header';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { dataManager } from '@/services/DataManager';
-import { Medicine } from '@/types/medicine';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+
+// --- ĐỊNH NGHĨA THEME (Fix lỗi import) ---
+const THEME = {
+  primary: '#137fec',
+  bg: '#f6f7f8',
+  white: '#ffffff',
+  text: '#111418',
+  textGray: '#617589',
+  border: '#dbe0e6',
+  red: '#ef4444',
+  redBg: '#fef2f2',
+  orange: '#f97316',
+  orangeBg: '#fff7ed',
+  green: '#22c55e',
+  greenBg: '#f0fdf4',
+  blueBg: '#eff6ff',
+};
 
 export default function MedicinesScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
-  
-  const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [medicines, setMedicines] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const categories = dataManager.getAllCategories();
+  const [filteredMedicines, setFilteredMedicines] = useState<any[]>([]);
 
+  // 1. Load dữ liệu ban đầu
   useEffect(() => {
-    loadMedicines();
-  }, [selectedCategory, searchQuery]);
+    const data = dataManager.getAllMedicines();
+    setMedicines(data);
+    setFilteredMedicines(data);
+  }, []);
 
-  const loadMedicines = () => {
-    let result = dataManager.getAllMedicines();
-    
-    if (selectedCategory !== 'all') {
-      result = result.filter(m => m.category === selectedCategory);
+  // 2. Xử lý logic tìm kiếm
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredMedicines(medicines);
+    } else {
+      const lowerQuery = searchQuery.toLowerCase();
+      const filtered = medicines.filter(
+        (item) => 
+          item.name.toLowerCase().includes(lowerQuery) || 
+          item.id.toLowerCase().includes(lowerQuery)
+      );
+      setFilteredMedicines(filtered);
     }
-    
-    if (searchQuery) {
-      result = dataManager.searchMedicines(searchQuery);
-    }
-    
-    setMedicines(result);
+  }, [searchQuery, medicines]);
+
+  // 3. Helper tính trạng thái tồn kho
+  const getStockStatus = (quantity: number) => {
+    if (quantity === 0) return { label: 'Hết hàng', color: THEME.red, bg: THEME.redBg };
+    if (quantity <= 10) return { label: 'Sắp hết', color: THEME.orange, bg: THEME.orangeBg };
+    return { label: 'Còn hàng', color: THEME.green, bg: THEME.greenBg };
   };
 
-  const getTotalStock = (medicine: Medicine) => {
-    return medicine.batches.reduce((sum, batch) => sum + batch.quantity, 0);
-  };
+  // 4. Render từng item thuốc
+  const renderItem = ({ item, index }: { item: any; index: number }) => {
+    // Tính tổng tồn từ các batch
+    const totalStock = item.batches 
+      ? item.batches.reduce((sum: number, b: any) => sum + b.quantity, 0) 
+      : 0;
+      
+    const status = getStockStatus(totalStock);
 
-  const getStockStatus = (medicine: Medicine) => {
-    const total = getTotalStock(medicine);
-    if (total === 0) return { text: 'Hết hàng', color: colors.danger };
-    if (total <= medicine.minStock) return { text: 'Sắp hết', color: colors.warning };
-    return { text: 'Còn hàng', color: colors.success };
+    return (
+      <Animated.View entering={FadeInDown.delay(index * 50).duration(400)}>
+        <TouchableOpacity 
+          style={styles.card} 
+          onPress={() => router.push(`/medicines/${item.id}` as any)}
+          activeOpacity={0.7} // Đã sửa lỗi cú pháp tại đây
+        >
+          {/* Cột trái: Icon */}
+          <View style={styles.iconContainer}>
+            <MaterialIcons name="medication" size={28} color={THEME.primary} />
+          </View>
+
+          {/* Cột phải: Thông tin */}
+          <View style={styles.infoContainer}>
+            <View style={styles.topRow}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={styles.medName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.medSku}>SKU: {item.id}</Text>
+              </View>
+              <Text style={styles.medPrice}>{item.price?.toLocaleString()} ₫</Text>
+            </View>
+
+            <View style={styles.bottomRow}>
+              <View style={styles.unitBadge}>
+                 <Text style={styles.unitText}>{item.unit}</Text>
+              </View>
+
+              <View style={[styles.stockBadge, { backgroundColor: status.bg }]}>
+                <View style={[styles.dot, { backgroundColor: status.color }]} />
+                <Text style={[styles.stockText, { color: status.color }]}>
+                  {status.label}: <Text style={{fontWeight: 'bold'}}>{totalStock}</Text>
+                </Text>
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header title="Danh sách thuốc" />
-      
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
-          {/* Header Actions */}
-          <Animated.View entering={FadeInDown.duration(400)} style={styles.headerActions}>
-            <Input
-              placeholder="Tìm kiếm thuốc theo tên, hoạt chất, barcode..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              icon="🔍"
-              containerStyle={{ flex: 1, marginBottom: 0 }}
-            />
-            <Button
-              title="Thêm thuốc"
-              onPress={() => router.push('/medicines/add')}
-              icon="➕"
-              variant="primary"
-            />
-          </Animated.View>
-
-          {/* Category Filter */}
-          <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              style={styles.categoryScroll}
-            >
-              <TouchableOpacity
-                style={[
-                  styles.categoryChip,
-                  { borderColor: colors.border },
-                  selectedCategory === 'all' && { 
-                    backgroundColor: colors.primary,
-                    borderColor: colors.primary,
-                  }
-                ]}
-                onPress={() => setSelectedCategory('all')}
-              >
-                <Text style={[
-                  styles.categoryText,
-                  { color: colors.text },
-                  selectedCategory === 'all' && { color: '#fff' }
-                ]}>
-                  Tất cả ({medicines.length})
-                </Text>
-              </TouchableOpacity>
-              
-              {categories.map((cat) => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[
-                    styles.categoryChip,
-                    { borderColor: colors.border },
-                    selectedCategory === cat.id && { 
-                      backgroundColor: colors.primary,
-                      borderColor: colors.primary,
-                    }
-                  ]}
-                  onPress={() => setSelectedCategory(cat.id)}
-                >
-                  <Text style={{ fontSize: 16 }}>{cat.icon}</Text>
-                  <Text style={[
-                    styles.categoryText,
-                    { color: colors.text },
-                    selectedCategory === cat.id && { color: '#fff' }
-                  ]}>
-                    {cat.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </Animated.View>
-
-          {/* Stats Cards */}
-          <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.statsGrid}>
-            <Card style={styles.statCard} padding={Spacing.md}>
-              <Text style={[styles.statValue, { color: colors.primary }]}>{medicines.length}</Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Tổng thuốc</Text>
-            </Card>
-            <Card style={styles.statCard} padding={Spacing.md}>
-              <Text style={[styles.statValue, { color: colors.success }]}>
-                {medicines.filter(m => getTotalStock(m) > m.minStock).length}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Còn hàng</Text>
-            </Card>
-            <Card style={styles.statCard} padding={Spacing.md}>
-              <Text style={[styles.statValue, { color: colors.warning }]}>
-                {medicines.filter(m => {
-                  const stock = getTotalStock(m);
-                  return stock > 0 && stock <= m.minStock;
-                }).length}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Sắp hết</Text>
-            </Card>
-            <Card style={styles.statCard} padding={Spacing.md}>
-              <Text style={[styles.statValue, { color: colors.danger }]}>
-                {medicines.filter(m => getTotalStock(m) === 0).length}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Hết hàng</Text>
-            </Card>
-          </Animated.View>
-
-          {/* Medicine List */}
-          <View style={styles.medicineList}>
-            {medicines.map((medicine, index) => {
-              const stockStatus = getStockStatus(medicine);
-              const totalStock = getTotalStock(medicine);
-              const categoryData = categories.find(c => c.id === medicine.category);
-
-              return (
-                <Animated.View
-                  key={medicine.id}
-                  entering={FadeInRight.delay(300 + index * 50).duration(400)}
-                >
-                  <TouchableOpacity
-                    onPress={() => router.push(`/medicines/${medicine.id}` as any)}
-                    activeOpacity={0.7}
-                  >
-                    <Card style={styles.medicineCard}>
-                      <View style={styles.medicineHeader}>
-                        <View style={styles.medicineInfo}>
-                          <View style={styles.medicineTitleRow}>
-                            <Text style={[styles.medicineName, { color: colors.text }]}>
-                              {medicine.name}
-                            </Text>
-                            <View style={[styles.statusBadge, { backgroundColor: stockStatus.color + '20' }]}>
-                              <View style={[styles.statusDot, { backgroundColor: stockStatus.color }]} />
-                              <Text style={[styles.statusText, { color: stockStatus.color }]}>
-                                {stockStatus.text}
-                              </Text>
-                            </View>
-                          </View>
-                          <Text style={[styles.medicineIngredient, { color: colors.textSecondary }]}>
-                            {medicine.activeIngredient}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={[styles.medicineDivider, { backgroundColor: colors.borderLight }]} />
-
-                      <View style={styles.medicineDetails}>
-                        <View style={styles.detailItem}>
-                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Nhóm:</Text>
-                          <View style={styles.categoryBadge}>
-                            <Text style={{ fontSize: 14 }}>{categoryData?.icon}</Text>
-                            <Text style={[styles.detailValue, { color: colors.text }]}>
-                              {categoryData?.name}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.detailItem}>
-                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Tồn kho:</Text>
-                          <Text style={[
-                            styles.detailValue, 
-                            { 
-                              color: totalStock <= medicine.minStock ? colors.danger : colors.text,
-                              fontWeight: 'bold',
-                            }
-                          ]}>
-                            {totalStock} {medicine.unit}
-                          </Text>
-                        </View>
-
-                        <View style={styles.detailItem}>
-                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Giá bán:</Text>
-                          <Text style={[styles.detailValue, { color: colors.primary, fontWeight: 'bold' }]}>
-                            {medicine.batches[0]?.sellingPrice.toLocaleString('vi-VN')} đ
-                          </Text>
-                        </View>
-
-                        <View style={styles.detailItem}>
-                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Số lô:</Text>
-                          <Text style={[styles.detailValue, { color: colors.text }]}>
-                            {medicine.batches.length} lô
-                          </Text>
-                        </View>
-                      </View>
-                    </Card>
-                  </TouchableOpacity>
-                </Animated.View>
-              );
-            })}
-          </View>
-
-          {medicines.length === 0 && (
-            <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.emptyState}>
-              <Text style={{ fontSize: 64 }}>📦</Text>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                {searchQuery ? 'Không tìm thấy thuốc nào' : 'Chưa có thuốc nào'}
-              </Text>
-              <Button
-                title="Thêm thuốc đầu tiên"
-                onPress={() => router.push('/medicines/add')}
-                variant="primary"
-              />
-            </Animated.View>
+    <View style={styles.container}>
+      {/* --- HEADER --- */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>Danh sách thuốc</Text>
+          <TouchableOpacity 
+            style={styles.addButton} 
+            onPress={() => router.push('/medicines/add' as any)}
+            activeOpacity={0.8}
+          >
+            <MaterialIcons name="add" size={24} color={THEME.white} />
+            <Text style={styles.addButtonText}>Thêm mới</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.searchContainer}>
+          <MaterialIcons name="search" size={20} color={THEME.textGray} />
+          <TextInput 
+            style={styles.searchInput}
+            placeholder="Tìm tên thuốc, hoạt chất, SKU..."
+            placeholderTextColor={THEME.textGray}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <MaterialIcons name="close" size={20} color={THEME.textGray} />
+            </TouchableOpacity>
           )}
         </View>
-      </ScrollView>
+      </View>
+
+      {/* --- LIST VIEW --- */}
+      <FlatList
+        data={filteredMedicines}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <MaterialIcons name="search-off" size={48} color={THEME.border} />
+            <Text style={styles.emptyText}>Không tìm thấy thuốc nào</Text>
+          </View>
+        }
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { 
+    flex: 1, 
+    backgroundColor: THEME.bg 
   },
-  content: {
-    padding: Spacing.md,
-    maxWidth: 1200,
-    width: '100%',
-    alignSelf: 'center',
+  
+  // Header Styles
+  header: { 
+    backgroundColor: THEME.white, 
+    paddingHorizontal: 16, 
+    paddingBottom: 16, 
+    paddingTop: 50, 
+    borderBottomWidth: 1, 
+    borderBottomColor: THEME.border 
   },
-  headerActions: {
-    flexDirection: Platform.OS === 'web' ? 'row' : 'column',
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
+  headerTop: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 16 
   },
-  categoryScroll: {
-    marginBottom: Spacing.lg,
+  headerTitle: { 
+    fontSize: 24, 
+    fontWeight: 'bold', 
+    color: THEME.text 
   },
-  categoryChip: {
+  addButton: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: THEME.primary, 
+    paddingHorizontal: 12, 
+    paddingVertical: 8, 
+    borderRadius: 8, 
+    gap: 4 
+  },
+  addButtonText: { 
+    color: THEME.white, 
+    fontWeight: '600', 
+    fontSize: 14 
+  },
+  searchContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#f0f2f4', 
+    borderRadius: 8, 
+    paddingHorizontal: 12, 
+    height: 44 
+  },
+  searchInput: { 
+    flex: 1, 
+    marginLeft: 8, 
+    fontSize: 14, 
+    color: THEME.text 
+  },
+
+  // List Styles
+  listContent: { 
+    padding: 16, 
+    gap: 12 
+  },
+  
+  // Card Styles
+  card: { 
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    marginRight: Spacing.sm,
+    backgroundColor: THEME.white, 
+    borderRadius: 12, 
+    padding: 12, 
+    borderWidth: 1, 
+    borderColor: THEME.border, 
+    shadowColor: "#000", 
+    shadowOffset: { width: 0, height: 1 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 2, 
+    elevation: 1 
   },
-  categoryText: {
-    fontSize: FontSizes.sm,
-    fontWeight: '500',
+  iconContainer: { 
+    width: 56, 
+    height: 56, 
+    borderRadius: 8, 
+    backgroundColor: THEME.blueBg, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginRight: 12
   },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    marginBottom: Spacing.lg,
-    flexWrap: 'wrap',
-  },
-  statCard: {
+  infoContainer: {
     flex: 1,
-    minWidth: 100,
-    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6
   },
-  statValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: Spacing.xs,
-  },
-  statLabel: {
-    fontSize: FontSizes.sm,
-    textAlign: 'center',
-  },
-  medicineList: {
-    gap: Spacing.md,
-  },
-  medicineCard: {
-    padding: Spacing.md,
-  },
-  medicineHeader: {
-    marginBottom: Spacing.sm,
-  },
-  medicineInfo: {
-    flex: 1,
-  },
-  medicineTitleRow: {
+  topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.xs,
+    alignItems: 'flex-start'
   },
-  medicineName: {
-    fontSize: FontSizes.lg,
-    fontWeight: 'bold',
-    flex: 1,
+  medName: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: THEME.text,
+    marginBottom: 2
   },
-  medicineIngredient: {
-    fontSize: FontSizes.sm,
+  medSku: { 
+    fontSize: 12, 
+    color: THEME.textGray 
   },
-  statusBadge: {
+  medPrice: { 
+    fontSize: 15, 
+    fontWeight: '700', 
+    color: THEME.primary 
+  },
+  bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
+    gap: 8
   },
-  statusDot: {
+  unitBadge: {
+    backgroundColor: '#f0f2f4',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4
+  },
+  unitText: {
+    fontSize: 12,
+    color: THEME.textGray
+  },
+  stockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12, 
+    gap: 4
+  },
+  dot: {
     width: 6,
     height: 6,
-    borderRadius: 3,
+    borderRadius: 3
   },
-  statusText: {
-    fontSize: 11,
-    fontWeight: 'bold',
+  stockText: {
+    fontSize: 12,
+    fontWeight: '500'
   },
-  medicineDivider: {
-    height: 1,
-    marginVertical: Spacing.sm,
-  },
-  medicineDetails: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  detailLabel: {
-    fontSize: FontSizes.sm,
-  },
-  detailValue: {
-    fontSize: FontSizes.sm,
-    fontWeight: '500',
-  },
-  categoryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
+  
+  // Empty State
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.xxl * 2,
-    gap: Spacing.md,
+    marginTop: 60,
+    gap: 12
   },
   emptyText: {
-    fontSize: FontSizes.lg,
-    textAlign: 'center',
-  },
+    color: THEME.textGray,
+    fontSize: 14
+  }
 });

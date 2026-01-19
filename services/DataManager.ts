@@ -3,27 +3,86 @@ import { Customer } from '@/types/customer';
 import { Invoice, PurchaseOrder } from '@/types/invoice';
 import { Medicine } from '@/types/medicine';
 
+// 1. Định nghĩa Interface
+export interface Employee {
+  id: string;
+  name: string;
+  username: string;
+  role: 'admin' | 'manager' | 'staff';
+  phone: string;
+  status: 'active' | 'inactive';
+  lastLogin?: string;
+}
+
+export interface AppSettings {
+  theme: 'light' | 'dark';
+  notifications: boolean;
+  biometricLogin: boolean;
+  autoBackup: boolean;
+  shopName: string;
+  shopAddress: string;
+  shopPhone: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  email?: string;
+  debt: number;
+}
+
+interface ExtendedCustomer extends Customer {
+  isVip?: boolean;
+  points?: number;
+  lastVisit?: string;
+}
+
+// Cấu trúc dữ liệu chính
 type PharmacyData = {
   pharmacyInfo: any;
   categories: any[];
   units: any[];
   medicines: Medicine[];
-  suppliers: any[];
-  customers: Customer[];
+  suppliers: Supplier[];
+  customers: ExtendedCustomer[];
   invoices: Invoice[];
   purchaseOrders?: PurchaseOrder[];
-  staff: any[];
+  employees: Employee[]; 
+  settings: AppSettings;
 };
 
 class DataManager {
   private data: PharmacyData;
 
+  // Dữ liệu mặc định cho Settings
+  private defaultSettings: AppSettings = {
+    theme: 'light',
+    notifications: true,
+    biometricLogin: false,
+    autoBackup: true,
+    shopName: 'Pharmacy Pro',
+    shopAddress: '123 Đường Sức Khỏe, TP.HCM',
+    shopPhone: '1900 1000'
+  };
+
+  // Dữ liệu mặc định cho Employees
+  private defaultEmployees: Employee[] = [
+    { id: '1', name: 'Nguyễn Văn Quản Lý', username: 'admin', role: 'admin', phone: '0909123456', status: 'active', lastLogin: '2025-06-15 08:30' },
+    { id: '2', name: 'Trần Thị Thu Ngân', username: 'staff1', role: 'staff', phone: '0909111222', status: 'active', lastLogin: '2025-06-14 14:00' },
+    { id: '3', name: 'Lê Văn Kho', username: 'kho1', role: 'manager', phone: '0909333444', status: 'inactive' },
+  ];
+
   constructor() {
-    this.data = pharmacyData as PharmacyData;
+    // --- SỬA LỖI TẠI ĐÂY: Thêm 'as unknown' để bỏ qua lỗi thiếu trường ---
+    this.data = pharmacyData as unknown as PharmacyData;
+    
     this.loadFromLocalStorage();
+    this.initializeMissingData(); 
   }
 
-  // Load data from localStorage if available
+  // --- STORAGE HANDLERS ---
   private loadFromLocalStorage(): void {
     if (typeof window !== 'undefined') {
       const savedData = localStorage.getItem('pharmacyData');
@@ -31,31 +90,98 @@ class DataManager {
         try {
           this.data = JSON.parse(savedData);
         } catch (error) {
-          console.error('Error loading data from localStorage:', error);
+          console.error('Error loading data:', error);
         }
       }
     }
   }
 
-  // Save data to localStorage
   private saveToLocalStorage(): void {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('pharmacyData', JSON.stringify(this.data));
       } catch (error) {
-        console.error('Error saving data to localStorage:', error);
+        console.error('Error saving data:', error);
       }
     }
   }
 
-  // Generic CRUD operations
+  // Khởi tạo dữ liệu nếu thiếu
+  private initializeMissingData(): void {
+    // 1. Init Suppliers
+    if (!this.data.suppliers || this.data.suppliers.length === 0) {
+      this.data.suppliers = [
+        { id: '1', name: 'Dược Hậu Giang (DHG)', phone: '0292 389 1433', address: '288 Bis Nguyễn Văn Cừ, Cần Thơ', debt: 15000000, email: 'dhgpharma@dhg.com.vn' },
+        { id: '2', name: 'Traphaco', phone: '1800 6612', address: '75 Yên Ninh, Ba Đình, Hà Nội', debt: 0, email: 'info@traphaco.com.vn' },
+        { id: '3', name: 'Sanofi Việt Nam', phone: '028 3829 8526', address: 'Q.1, TP. Hồ Chí Minh', debt: 5600000, email: 'contact@sanofi.vn' },
+      ];
+    }
+    
+    // 2. Init Customers
+    if (!this.data.customers) {
+        this.data.customers = [];
+    }
+
+    // 3. Init Settings (Đảm bảo settings luôn tồn tại)
+    if (!this.data.settings) {
+        this.data.settings = { ...this.defaultSettings };
+    }
+
+    // 4. Init Employees (Đảm bảo employees luôn tồn tại)
+    if (!this.data.employees) {
+        this.data.employees = [...this.defaultEmployees];
+    }
+    
+    // Lưu lại ngay để đồng bộ cấu trúc mới
+    this.saveToLocalStorage();
+  }
+
   private generateId(prefix: string): string {
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 1000);
     return `${prefix}_${timestamp}_${random}`;
   }
 
-  // MEDICINES
+  // --- SETTINGS ---
+  getSettings() { 
+      // Fallback về default nếu chưa có để an toàn
+      return this.data.settings || this.defaultSettings; 
+  }
+
+  updateSettings(newSettings: Partial<AppSettings>) {
+    this.data.settings = { ...this.data.settings, ...newSettings };
+    this.saveToLocalStorage();
+  }
+
+  // --- EMPLOYEES ---
+  getAllEmployees() { 
+      return this.data.employees || []; 
+  }
+
+  addEmployee(emp: Omit<Employee, 'id' | 'lastLogin'>) {
+    const newEmp: Employee = {
+      ...emp,
+      id: Date.now().toString(),
+      status: 'active'
+    };
+    this.data.employees.unshift(newEmp);
+    this.saveToLocalStorage();
+  }
+
+  updateEmployee(id: string, updates: Partial<Employee>) {
+    const index = this.data.employees.findIndex(e => e.id === id);
+    if (index !== -1) {
+      this.data.employees[index] = { ...this.data.employees[index], ...updates };
+      this.saveToLocalStorage();
+    }
+  }
+
+  deleteEmployee(id: string) {
+    this.data.employees = this.data.employees.filter(e => e.id !== id);
+    this.saveToLocalStorage();
+  }
+
+  // --- MEDICINES ---
   getAllMedicines(): Medicine[] {
     return this.data.medicines;
   }
@@ -98,7 +224,6 @@ class DataManager {
     return true;
   }
 
-  // Get medicines by filters
   getMedicinesByCategory(categoryId: string): Medicine[] {
     return this.data.medicines.filter((m) => m.category === categoryId);
   }
@@ -132,28 +257,31 @@ class DataManager {
     );
   }
 
-  // CUSTOMERS
-  getAllCustomers(): Customer[] {
+  // --- CUSTOMERS ---
+  getAllCustomers(): ExtendedCustomer[] {
     return this.data.customers;
   }
 
-  getCustomerById(id: string): Customer | undefined {
+  getCustomerById(id: string): ExtendedCustomer | undefined {
     return this.data.customers.find((c) => c.id === id);
   }
 
-  addCustomer(customer: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>): Customer {
-    const newCustomer: Customer = {
+  addCustomer(customer: Omit<ExtendedCustomer, 'id' | 'createdAt' | 'updatedAt'>): ExtendedCustomer {
+    const newCustomer: ExtendedCustomer = {
       ...customer,
       id: this.generateId('cus'),
+      totalPurchases: 0,
+      points: 0,
+      isVip: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    this.data.customers.push(newCustomer);
+    this.data.customers.unshift(newCustomer);
     this.saveToLocalStorage();
     return newCustomer;
   }
 
-  updateCustomer(id: string, updates: Partial<Customer>): Customer | null {
+  updateCustomer(id: string, updates: Partial<ExtendedCustomer>): ExtendedCustomer | null {
     const index = this.data.customers.findIndex((c) => c.id === id);
     if (index === -1) return null;
 
@@ -166,17 +294,52 @@ class DataManager {
     return this.data.customers[index];
   }
 
-  searchCustomers(query: string): Customer[] {
+  searchCustomers(query: string): ExtendedCustomer[] {
     const lowerQuery = query.toLowerCase();
     return this.data.customers.filter(
       (c) =>
         c.name.toLowerCase().includes(lowerQuery) ||
         c.phone.includes(query) ||
-        c.code.toLowerCase().includes(lowerQuery)
+        (c.code && c.code.toLowerCase().includes(lowerQuery))
     );
   }
 
-  // INVOICES
+  // --- SUPPLIERS ---
+  getAllSuppliers(): Supplier[] {
+    return this.data.suppliers || [];
+  }
+
+  getSupplierById(id: string): Supplier | undefined {
+    return this.data.suppliers?.find((s) => s.id === id);
+  }
+
+  addSupplier(supplier: Omit<Supplier, 'id' | 'debt'>): Supplier {
+    const newSupplier: Supplier = {
+      ...supplier,
+      id: this.generateId('sup'),
+      debt: 0,
+    };
+    
+    if (!this.data.suppliers) this.data.suppliers = [];
+    this.data.suppliers.unshift(newSupplier);
+    this.saveToLocalStorage();
+    return newSupplier;
+  }
+
+  updateSupplier(id: string, updates: Partial<Supplier>): Supplier | null {
+    if (!this.data.suppliers) return null;
+    const index = this.data.suppliers.findIndex((s) => s.id === id);
+    if (index === -1) return null;
+
+    this.data.suppliers[index] = {
+      ...this.data.suppliers[index],
+      ...updates,
+    };
+    this.saveToLocalStorage();
+    return this.data.suppliers[index];
+  }
+
+  // --- INVOICES ---
   getAllInvoices(): Invoice[] {
     return this.data.invoices;
   }
@@ -194,7 +357,7 @@ class DataManager {
     };
     this.data.invoices.push(newInvoice);
 
-    // Update medicine stock
+    // Update stock
     invoice.items.forEach((item) => {
       const medicine = this.getMedicineById(item.medicineId);
       if (medicine) {
@@ -205,12 +368,20 @@ class DataManager {
       }
     });
 
-    // Update customer info if exists
+    // Update customer stats
     if (invoice.customerId) {
       const customer = this.getCustomerById(invoice.customerId);
       if (customer) {
         customer.totalPurchases += invoice.total;
         customer.lastPurchaseDate = new Date().toISOString();
+        
+        if (!customer.points) customer.points = 0;
+        customer.points += Math.floor(invoice.total / 10000);
+        
+        if (customer.totalPurchases > 5000000 || customer.points > 500) {
+            customer.isVip = true;
+        }
+
         this.updateCustomer(customer.id, customer);
       }
     }
@@ -234,7 +405,7 @@ class DataManager {
     return todayInvoices.reduce((sum, i) => sum + i.total, 0);
   }
 
-  // CATEGORIES & UNITS
+  // --- CATEGORIES & UNITS ---
   getAllCategories(): any[] {
     return this.data.categories;
   }
@@ -263,16 +434,7 @@ class DataManager {
     return newUnit;
   }
 
-  // SUPPLIERS
-  getAllSuppliers(): any[] {
-    return this.data.suppliers;
-  }
-
-  getSupplierById(id: string): any {
-    return this.data.suppliers.find((s) => s.id === id);
-  }
-
-  // PHARMACY INFO
+  // --- PHARMACY INFO ---
   getPharmacyInfo(): any {
     return this.data.pharmacyInfo;
   }
@@ -285,16 +447,16 @@ class DataManager {
     this.saveToLocalStorage();
   }
 
-  // EXPORT DATA
+  // --- UTILS ---
   exportData(): string {
     return JSON.stringify(this.data, null, 2);
   }
 
-  // IMPORT DATA
   importData(jsonData: string): boolean {
     try {
       const parsedData = JSON.parse(jsonData);
       this.data = parsedData;
+      this.initializeMissingData(); 
       this.saveToLocalStorage();
       return true;
     } catch (error) {
@@ -303,12 +465,17 @@ class DataManager {
     }
   }
 
-  // RESET DATA
   resetData(): void {
-    this.data = pharmacyData as PharmacyData;
+    // --- SỬA LỖI TẠI ĐÂY NỮA ---
+    this.data = pharmacyData as unknown as PharmacyData;
+    
+    // Clear trường employees và settings để nó tự init lại mặc định
+    (this.data as any).employees = undefined; 
+    (this.data as any).settings = undefined;
+    
+    this.initializeMissingData();
     this.saveToLocalStorage();
   }
 }
 
-// Export singleton instance
 export const dataManager = new DataManager();

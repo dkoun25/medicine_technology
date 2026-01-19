@@ -4,7 +4,6 @@
     "slug": "medicine_technology",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
     "scheme": "medicinetechnology",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,

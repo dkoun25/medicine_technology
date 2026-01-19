@@ -1,35 +1,35 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { CustomDrawerContent } from '@/components/layout/Sidebar';
+import { Drawer } from 'expo-router/drawer';
+import { useWindowDimensions } from 'react-native';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+export default function DrawerLayout() {
+  const { width } = useWindowDimensions();
+  // Nếu chiều rộng > 768px (Tablet/Web) thì coi là màn hình lớn
+  const isLargeScreen = width >= 768; 
 
   return (
-    <Tabs
+    <Drawer
+      drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
-    </Tabs>
+        headerShown: false, // Vẫn ẩn header mặc định của Drawer
+        
+        // --- CẤU HÌNH QUAN TRỌNG CHO WEB ---
+        // 'permanent': Luôn hiện (cho Web)
+        // 'front': Trượt ra từ bên trái (cho Mobile)
+        drawerType: isLargeScreen ? 'permanent' : 'front',
+        
+        // Chỉnh style cho drawer
+        drawerStyle: {
+           width: 280,
+           backgroundColor: 'transparent', // Để sidebar không bị màu nền mặc định đè lên
+           borderRightWidth: isLargeScreen ? 0 : 1, // Web thì không cần đường viền ngăn cách quá rõ
+        },
+        
+        // Trên web (permanent) thì không cần lớp phủ mờ tối màu nền
+        overlayColor: isLargeScreen ? 'transparent' : 'rgba(0,0,0,0.5)',
+      }}
+    >
+      {/* Các màn hình sẽ tự động được load dựa trên file trong thư mục */}
+    </Drawer>
   );
 }
