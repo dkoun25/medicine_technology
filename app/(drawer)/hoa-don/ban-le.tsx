@@ -1,48 +1,42 @@
+import { useTheme } from '@/context/ThemeContext';
+import { useInvoices } from '@/hooks/useInvoices';
+import { Invoice } from '@/types/invoice';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useTheme } from '@/context/ThemeContext';
 
 export default function RetailInvoicesScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { invoices: allInvoices, loading, loadInvoices: reloadInvoices } = useInvoices();
   
-  const [invoices, setInvoices] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredData, setFilteredData] = useState<any[]>([]);
+  const [filteredData, setFilteredData] = useState<Invoice[]>([]);
 
+  // Lọc hóa đơn bán lẻ
   useEffect(() => {
-    loadInvoices();
-  }, []);
+    const retailInvoices = allInvoices.filter(inv => inv.type === 'retail');
+    setFilteredData(retailInvoices);
+  }, [allInvoices]);
 
-  const loadInvoices = () => {
-    // Lấy invoices từ localStorage
-    const stored = localStorage.getItem('invoices');
-    if (stored) {
-      const allInvoices = JSON.parse(stored);
-      const retailInvoices = allInvoices.filter((inv: any) => inv.type === 'ban-le');
-      setInvoices(retailInvoices);
+  // Tìm kiếm
+  useEffect(() => {
+    const retailInvoices = allInvoices.filter(inv => inv.type === 'retail');
+    
+    if (!searchQuery) {
       setFilteredData(retailInvoices);
     } else {
-      setInvoices([]);
-      setFilteredData([]);
-    }
-  };
-
-  useEffect(() => {
-    if (!searchQuery) {
-      setFilteredData(invoices);
-    } else {
       const lower = searchQuery.toLowerCase();
-      const filtered = invoices.filter(item => 
+      const filtered = retailInvoices.filter(item => 
+        item.code?.toLowerCase().includes(lower) || 
         item.id?.toLowerCase().includes(lower) || 
         item.customerName?.toLowerCase().includes(lower)
       );
       setFilteredData(filtered);
     }
-  }, [searchQuery, invoices]);
+  }, [searchQuery, allInvoices]);
 
   // Hàm lấy màu status thông minh (tự chỉnh màu nền cho đậm hơn khi ở Dark Mode)
   const getStatusStyle = (status: string) => {
@@ -68,18 +62,31 @@ export default function RetailInvoicesScreen() {
     }
   };
 
-  const renderItem = ({ item, index }: { item: any, index: number }) => {
+  const renderItem = ({ item, index }: { item: Invoice, index: number }) => {
     const status = getStatusStyle(item.status);
     return (
       <Animated.View entering={FadeInDown.delay(index * 50).duration(400)}>
         <TouchableOpacity 
           style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]} 
           activeOpacity={0.7}
+          onPress={() => {
+            Alert.alert(
+              `Hóa đơn ${item.code}`,
+              `Khách hàng: ${item.customerName || 'Khách Vãng Lai'}\n` +
+              `Ngày tạo: ${new Date(item.createdAt).toLocaleString('vi-VN')}\n` +
+              `Thu ngân: ${item.cashierName}\n` +
+              `Số lượng SP: ${item.items.length}\n` +
+              `Tổng tiền: ${item.total.toLocaleString()} ₫\n` +
+              `Thanh toán: ${item.paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}\n` +
+              `Trạng thái: ${status.label}`,
+              [{ text: 'Đóng' }]
+            );
+          }}
         >
           <View style={styles.cardHeader}>
             <View>
-              <Text style={[styles.code, { color: colors.text }]}>#{item.id}</Text>
-              <Text style={styles.date}>{new Date(item.date).toLocaleString('vi-VN')}</Text>
+              <Text style={[styles.code, { color: colors.text }]}>{item.code}</Text>
+              <Text style={styles.date}>{new Date(item.createdAt).toLocaleString('vi-VN')}</Text>
             </View>
             <View style={[styles.badge, { backgroundColor: status.bg }]}>
               <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
@@ -100,7 +107,7 @@ export default function RetailInvoicesScreen() {
             </View>
             <View style={{alignItems: 'flex-end'}}>
               <Text style={styles.label}>Tổng tiền</Text>
-              <Text style={[styles.total, { color: colors.primary }]}>{item.totalAmount?.toLocaleString()} ₫</Text>
+              <Text style={[styles.total, { color: colors.primary }]}>{item.total.toLocaleString()} ₫</Text>
             </View>
           </View>
         </TouchableOpacity>

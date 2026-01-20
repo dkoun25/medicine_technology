@@ -1,20 +1,22 @@
+import { ConfirmModal, SuccessModal } from '@/components/ui/Modal';
+import { useTheme } from '@/context/ThemeContext';
+import { useInvoices } from '@/hooks/useInvoices';
 import { dataManager } from '@/services/DataManager';
+import { Invoice, InvoiceItem } from '@/types/invoice';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Dimensions,
+    FlatList,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useTheme } from '@/context/ThemeContext';
 
 // Lấy chiều rộng màn hình để responsive đơn giản
 const { width } = Dimensions.get('window');
@@ -23,10 +25,16 @@ const IS_TABLET = width > 768; // Logic đơn giản để check tablet/web
 export default function POSScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { saveInvoice } = useInvoices();
   const [products, setProducts] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<any[]>([]);
   const [customerName, setCustomerName] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successInvoiceCode, setSuccessInvoiceCode] = useState('');
+  const [successTotal, setSuccessTotal] = useState(0);
 
   const SEMANTIC = {
     green: '#22c55e',
@@ -76,66 +84,96 @@ export default function POSScreen() {
   const totalAmount = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   const handleCheckout = () => {
-    if (cart.length === 0) return Alert.alert('Lỗi', 'Giỏ hàng đang trống');
+    if (cart.length === 0) {
+      alert('Giỏ hàng đang trống');
+      return;
+    }
+    if (isProcessing) return;
+    
+    setShowConfirmModal(true);
+  };
+
+  const processCheckout = async () => {
+    setShowConfirmModal(false);
     
     const finalCustomerName = customerName.trim() || 'Khách Vãng Lai';
     
-    Alert.alert(
-      'Xác nhận thanh toán',
-      `Khách hàng: ${finalCustomerName}\nTổng tiền: ${totalAmount.toLocaleString()} ₫\nBạn có chắc chắn muốn xuất hóa đơn?`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        { 
-          text: 'Thanh toán', 
-          onPress: () => {
-            // Tạo hóa đơn
-            const invoice = {
-              id: `INV-${Date.now()}`,
-              type: 'ban-le',
-              customerName: finalCustomerName,
-              date: new Date().toISOString(),
-              items: cart.map(item => ({
-                medicineId: item.id,
-                medicineName: item.name,
-                quantity: item.quantity,
-                unitPrice: item.price,
-                totalPrice: item.price * item.quantity,
-              })),
-              totalAmount: totalAmount,
-              paymentMethod: 'Tiền mặt',
-              status: 'completed',
-            };
-            
-            // Lưu vào localStorage
-            const invoices = JSON.parse(localStorage.getItem('invoices') || '[]');
-            invoices.unshift(invoice);
-            localStorage.setItem('invoices', JSON.stringify(invoices));
-            
-            // Trừ kho
-            cart.forEach(item => {
-              const medicine = dataManager.getAllMedicines().find(m => m.id === item.id);
-              if (medicine && medicine.batches && medicine.batches.length > 0) {
-                let remaining = item.quantity;
-                const updatedBatches = medicine.batches.map((batch: any) => {
-                  if (remaining > 0 && batch.quantity > 0) {
-                    const deduct = Math.min(batch.quantity, remaining);
-                    remaining -= deduct;
-                    return { ...batch, quantity: batch.quantity - deduct };
-                  }
-                  return batch;
-                }).filter((b: any) => b.quantity > 0);
-                
-                dataManager.updateMedicine(medicine.id, { batches: updatedBatches });
-              }
-            });
-            
-            Alert.alert('✅ Thành công', `Hóa đơn ${invoice.id} đã được tạo!\nKhách hàng: ${finalCustomerName}`);
-            clearCart();
-            setCustomerName('');
-          } 
+    try {
+      setIsProcessing(true);
+      
+      // Tạo invoice items với đúng định dạng
+      const invoiceItems: InvoiceItem[] = cart.map(item => {
+        const itemTotal = item.price * item.quantity;
+        return {
+          medicineId: item.id,
+          medicineName: item.name,
+          batchId: item.batches?.[0]?.id || 'BATCH-DEFAULT',
+          batchNumber: item.batches?.[0]?.batchNumber || 'N/A',
+          quantity: item.quantity,
+          unitPrice: item.price,
+          discount: 0,
+          total: itemTotal,
+        };
+      });
+      
+      // Tạo hóa đơn với đúng định dạng Invoice type
+      const now = new Date().toISOString();
+      const invoiceCode = `HD${Date.now().toString().slice(-6)}`;
+      
+      const invoice: Invoice = {
+        id: `INV-${Date.now()}`,
+        code: invoiceCode,
+        type: 'retail',
+        customerName: finalCustomerName,
+        items: invoiceItems,
+        subtotal: totalAmount,
+        discount: 0,
+        discountAmount: 0,
+        total: totalAmount,
+        paid: totalAmount,
+        change: 0,
+        paymentMethod: 'cash',
+        status: 'completed',
+        cashierId: 'CASHIER-001',
+        cashierName: 'Thu ngân',
+        createdAt: now,
+        updatedAt: now,
+      };
+      
+      // Lưu hóa đơn
+      await saveInvoice(invoice);
+      
+      // Trừ kho
+      cart.forEach(item => {
+        const medicine = dataManager.getAllMedicines().find(m => m.id === item.id);
+        if (medicine && medicine.batches && medicine.batches.length > 0) {
+          let remaining = item.quantity;
+          const updatedBatches = medicine.batches.map((batch: any) => {
+            if (remaining > 0 && batch.quantity > 0) {
+              const deduct = Math.min(batch.quantity, remaining);
+              remaining -= deduct;
+              return { ...batch, quantity: batch.quantity - deduct };
+            }
+            return batch;
+          }).filter((b: any) => b.quantity > 0);
+          
+          dataManager.updateMedicine(medicine.id, { batches: updatedBatches });
         }
-      ]
-    );
+      });
+      
+      // Hiển thị success modal
+      setSuccessInvoiceCode(invoice.code);
+      setSuccessTotal(totalAmount);
+      setShowSuccessModal(true);
+      
+      clearCart();
+      setCustomerName('');
+    } catch (error) {
+      console.error('Checkout error:', error);
+      alert('Không thể tạo hóa đơn. Vui lòng thử lại.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // 4. Render Item (Sản phẩm bên trái)
@@ -236,6 +274,10 @@ export default function POSScreen() {
     payButton: { 
       backgroundColor: colors.primary, borderRadius: 8, height: 48, 
       alignItems: 'center', justifyContent: 'center' 
+    },
+    payButtonDisabled: {
+      backgroundColor: isDark ? '#4b5563' : '#d1d5db',
+      opacity: 0.6,
     },
     payButtonText: { color: colors.card, fontSize: 16, fontWeight: 'bold' },
   });
@@ -338,12 +380,43 @@ export default function POSScreen() {
               <Text style={styles.totalValue}>{totalAmount.toLocaleString()} ₫</Text>
             </View>
             
-            <TouchableOpacity style={styles.payButton} onPress={handleCheckout}>
-              <Text style={styles.payButtonText}>THANH TOÁN</Text>
+            <TouchableOpacity 
+              style={[styles.payButton, (cart.length === 0 || isProcessing) && styles.payButtonDisabled]} 
+              onPress={handleCheckout}
+              disabled={cart.length === 0 || isProcessing}
+            >
+              <Text style={styles.payButtonText}>
+                {isProcessing ? 'ĐANG XỬ LÝ...' : 'THANH TOÁN'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        visible={showConfirmModal}
+        title="Xác nhận thanh toán"
+        message={`Khách hàng: ${customerName.trim() || 'Khách Vãng Lai'}\nTổng tiền: ${totalAmount.toLocaleString()} ₫\n\nBạn có chắc chắn muốn xuất hóa đơn?`}
+        onConfirm={processCheckout}
+        onCancel={() => setShowConfirmModal(false)}
+        confirmText="Thanh toán"
+        cancelText="Hủy"
+      />
+
+      {/* Success Modal */}
+      <SuccessModal
+        visible={showSuccessModal}
+        title="Thanh toán thành công"
+        message={`Hóa đơn: ${successInvoiceCode}\nKhách hàng: ${customerName.trim() || 'Khách Vãng Lai'}\nTổng tiền: ${successTotal.toLocaleString()} ₫`}
+        onPrimaryAction={() => {
+          setShowSuccessModal(false);
+          router.push('/(drawer)/hoa-don/ban-le' as any);
+        }}
+        onSecondaryAction={() => setShowSuccessModal(false)}
+        primaryText="Xem hóa đơn"
+        secondaryText="Tiếp tục bán"
+      />
     </View>
   );
 }

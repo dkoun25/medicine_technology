@@ -1,4 +1,5 @@
 import { useTheme } from '@/context/ThemeContext'; // Import hook
+import { useInvoices } from '@/hooks/useInvoices';
 import { dataManager } from '@/services/DataManager';
 import { MaterialIcons } from '@expo/vector-icons';
 import { DrawerActions } from '@react-navigation/native';
@@ -21,6 +22,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const { width } = useWindowDimensions();
+  const { invoices } = useInvoices();
   
   // 1. Lấy màu từ Context
   const { colors, isDark } = useTheme();
@@ -44,9 +46,12 @@ export default function DashboardScreen() {
     expiring: 0,
     lowStock: 0,
     todayRevenue: 0,
+    revenueChange: 0,
   });
   const [warnings, setWarnings] = useState<any[]>([]);
   const [categoryStats, setCategoryStats] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
+  const [chartTotal, setChartTotal] = useState(0);
 
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
@@ -54,20 +59,102 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [invoices]);
 
   const loadDashboardData = () => {
     const medicines = dataManager.getAllMedicines();
     const lowStockList = dataManager.getLowStockMedicines();
     const expiringList = dataManager.getExpiringMedicines(30);
-    const revenue = dataManager.getTodayRevenue();
+    
+    // Tính toán doanh thu chính xác từ database
+    let totalRevenue = 0;
+    
+    // Lọc hóa đơn hôm nay
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayInvoices = invoices.filter(inv => {
+      const invDate = new Date(inv.createdAt);
+      invDate.setHours(0, 0, 0, 0);
+      return invDate.getTime() === today.getTime();
+    });
+    
+    todayInvoices.forEach(invoice => {
+      if (invoice.status === 'completed') {
+        if (invoice.type === 'retail' || invoice.type === 'wholesale') {
+          // Bán lẻ và bán sỉ: Cộng vào doanh thu
+          totalRevenue += invoice.total;
+        } else if (invoice.type === 'return') {
+          // Trả hàng: Trừ ra (hoàn tiền)
+          totalRevenue -= invoice.total;
+        }
+      }
+    });
+    
+    // Tính phần trăm thay đổi (giả lập so với hôm qua)
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayInvoices = invoices.filter(inv => {
+      const invDate = new Date(inv.createdAt);
+      invDate.setHours(0, 0, 0, 0);
+      return invDate.getTime() === yesterday.getTime();
+    });
+    
+    let yesterdayRevenue = 0;
+    yesterdayInvoices.forEach(invoice => {
+      if (invoice.status === 'completed') {
+        if (invoice.type === 'retail' || invoice.type === 'wholesale') {
+          yesterdayRevenue += invoice.total;
+        } else if (invoice.type === 'return') {
+          yesterdayRevenue -= invoice.total;
+        }
+      }
+    });
+    
+    const revenueChange = yesterdayRevenue > 0 
+      ? ((totalRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 
+      : 0;
 
     setStats({
       totalSku: medicines.length,
       expiring: expiringList.length,
       lowStock: lowStockList.length,
-      todayRevenue: revenue,
+      todayRevenue: totalRevenue,
+      revenueChange: revenueChange,
     });
+
+    // Tính toán doanh thu 7 ngày
+    const last7Days: number[] = [];
+    let weekTotal = 0;
+    
+    for (let i = 6; i >= 0; i--) {
+      const targetDate = new Date(today);
+      targetDate.setDate(targetDate.getDate() - i);
+      targetDate.setHours(0, 0, 0, 0);
+      
+      const dayInvoices = invoices.filter(inv => {
+        const invDate = new Date(inv.createdAt);
+        invDate.setHours(0, 0, 0, 0);
+        return invDate.getTime() === targetDate.getTime();
+      });
+      
+      let dayRevenue = 0;
+      dayInvoices.forEach(invoice => {
+        if (invoice.status === 'completed') {
+          if (invoice.type === 'retail' || invoice.type === 'wholesale') {
+            dayRevenue += invoice.total;
+          } else if (invoice.type === 'return') {
+            dayRevenue -= invoice.total;
+          }
+        }
+      });
+      
+      // Chuyển sang nghìn đồng cho biểu đồ dễ đọc
+      last7Days.push(Math.round(dayRevenue / 1000));
+      weekTotal += dayRevenue;
+    }
+    
+    setChartData(last7Days);
+    setChartTotal(weekTotal);
 
     const combinedWarnings = [
       ...expiringList.map(m => ({ ...m, type: 'expiring', label: 'Sắp hết hạn', date: m.batches?.[0]?.expiryDate })),
@@ -191,11 +278,11 @@ export default function DashboardScreen() {
           />
           <StatCard 
             icon="payments" 
-            title="Doanh thu" 
-            value={`${(stats.todayRevenue / 1000).toFixed(0)}k đ`} 
-            badge="+12%" 
-            color={SEMANTIC.green} 
-            bg={SEMANTIC.greenBg} 
+            title="Doanh thu hôm nay" 
+            value={`${stats.todayRevenue >= 0 ? '' : '-'}${Math.abs(stats.todayRevenue).toLocaleString()} đ`} 
+            badge={`${stats.revenueChange >= 0 ? '+' : ''}${stats.revenueChange.toFixed(1)}%`}
+            color={stats.todayRevenue >= 0 ? SEMANTIC.green : SEMANTIC.red} 
+            bg={stats.todayRevenue >= 0 ? SEMANTIC.greenBg : SEMANTIC.redBg} 
             delay={300}
           />
         </View>
@@ -207,7 +294,11 @@ export default function DashboardScreen() {
             <View style={styles.cardHeader}>
               <View>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>Doanh thu 7 ngày</Text>
-                <Text style={[styles.cardSubtitle, { color: SEMANTIC.textGray }]}>Tổng: <Text style={{fontWeight: '700', color: colors.text}}>85tr</Text></Text>
+                <Text style={[styles.cardSubtitle, { color: SEMANTIC.textGray }]}>
+                  Tổng: <Text style={{fontWeight: '700', color: chartTotal >= 0 ? SEMANTIC.green : SEMANTIC.red}}>
+                    {chartTotal >= 0 ? '' : '-'}{Math.abs(chartTotal).toLocaleString()} đ
+                  </Text>
+                </Text>
               </View>
               <View style={[styles.dropdown, { backgroundColor: isDark ? '#333' : '#f0f2f4' }]}>
                 <Text style={{fontSize: 12, color: colors.text}}>7 ngày</Text>
@@ -218,7 +309,7 @@ export default function DashboardScreen() {
             <LineChart
               data={{
                 labels: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
-                datasets: [{ data: [20, 45, 28, 80, 99, 43, 85] }]
+                datasets: [{ data: chartData.length > 0 ? chartData : [0, 0, 0, 0, 0, 0, 0] }]
               }}
               width={width > 600 ? (width - 64) * 0.6 : width - 64} 
               height={180}
