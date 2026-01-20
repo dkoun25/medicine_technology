@@ -1,7 +1,8 @@
+import { dataManager } from '@/services/DataManager';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert, Modal, FlatList } from 'react-native';
 
 const THEME = {
   primary: '#137fec',
@@ -16,21 +17,74 @@ const THEME = {
 
 export default function ExportCancelScreen() {
   const router = useRouter();
-  // Giả lập state
+  const [medicines, setMedicines] = useState<any[]>([]);
+  const [selectedMedicine, setSelectedMedicine] = useState<any>(null);
+  const [selectedBatch, setSelectedBatch] = useState<any>(null);
+  const [showMedicineModal, setShowMedicineModal] = useState(false);
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  
   const [reason, setReason] = useState('expired'); // expired | damaged | lost
   const [quantity, setQuantity] = useState('');
   const [note, setNote] = useState('');
 
+  useEffect(() => {
+    const data = dataManager.getAllMedicines();
+    setMedicines(data);
+  }, []);
+
   const handleExport = () => {
-    alert('Đã tạo phiếu xuất hủy thành công!');
-    router.back();
+    if (!selectedMedicine) {
+      Alert.alert('Lỗi', 'Vui lòng chọn thuốc cần xuất hủy');
+      return;
+    }
+    if (!selectedBatch) {
+      Alert.alert('Lỗi', 'Vui lòng chọn lô (batch) cần xuất hủy');
+      return;
+    }
+    if (!quantity || parseInt(quantity) <= 0) {
+      Alert.alert('Lỗi', 'Vui lòng nhập số lượng hợp lệ');
+      return;
+    }
+    if (parseInt(quantity) > selectedBatch.quantity) {
+      Alert.alert('Lỗi', `Số lượng xuất hủy không được vượt quá ${selectedBatch.quantity}`);
+      return;
+    }
+
+    // Cập nhật số lượng trong kho
+    const updatedBatches = selectedMedicine.batches.map((b: any) => {
+      if (b.batchNumber === selectedBatch.batchNumber) {
+        return { ...b, quantity: b.quantity - parseInt(quantity) };
+      }
+      return b;
+    }).filter((b: any) => b.quantity > 0);
+
+    dataManager.updateMedicine(selectedMedicine.id, { batches: updatedBatches });
+
+    const reasonText = reason === 'expired' ? 'Hết hạn' : reason === 'damaged' ? 'Hư hỏng/Vỡ' : 'Thất thoát';
+    
+    Alert.alert(
+      '✅ Xuất hủy thành công',
+      `Đã xuất hủy ${quantity} ${selectedMedicine.unit || 'đơn vị'}\n${selectedMedicine.name}\nLô: ${selectedBatch.batchNumber}\nLý do: ${reasonText}`,
+      [{ text: 'OK', onPress: () => router.back() }]
+    );
+  };
+
+  const handleSelectMedicine = (medicine: any) => {
+    setSelectedMedicine(medicine);
+    setSelectedBatch(null);
+    setShowMedicineModal(false);
+  };
+
+  const handleSelectBatch = (batch: any) => {
+    setSelectedBatch(batch);
+    setShowBatchModal(false);
   };
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={{padding: 4}}>
+        <TouchableOpacity onPress={() => router.push('/medicines' as any)} style={{padding: 4}}>
            <MaterialIcons name="arrow-back" size={24} color={THEME.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Xuất hủy / Điều chỉnh</Text>
@@ -47,19 +101,29 @@ export default function ExportCancelScreen() {
           </Text>
         </View>
 
-        {/* Form chọn thuốc (Mockup: Giả sử đã chọn thuốc ID: 123) */}
+        {/* Form chọn thuốc */}
         <View style={styles.card}>
           <Text style={styles.label}>Thuốc cần xuất</Text>
-          <View style={styles.fakeSelect}>
-            <Text style={styles.fakeSelectText}>Panadol Extra (Viên nén)</Text>
+          <TouchableOpacity style={styles.fakeSelect} onPress={() => setShowMedicineModal(true)}>
+            <Text style={[styles.fakeSelectText, !selectedMedicine && { color: THEME.textGray }]}>
+              {selectedMedicine ? `${selectedMedicine.name} (${selectedMedicine.unit})` : 'Chọn thuốc...'}
+            </Text>
             <MaterialIcons name="arrow-drop-down" size={24} color={THEME.textGray} />
-          </View>
+          </TouchableOpacity>
           
           <Text style={[styles.label, {marginTop: 12}]}>Chọn Lô (Batch)</Text>
-          <View style={styles.fakeSelect}>
-            <Text style={styles.fakeSelectText}>L001 - HSD: 12/2025 (Tồn: 50)</Text>
+          <TouchableOpacity 
+            style={[styles.fakeSelect, !selectedMedicine && { opacity: 0.5 }]} 
+            onPress={() => selectedMedicine && setShowBatchModal(true)}
+            disabled={!selectedMedicine}
+          >
+            <Text style={[styles.fakeSelectText, !selectedBatch && { color: THEME.textGray }]}>
+              {selectedBatch 
+                ? `${selectedBatch.batchNumber} - HSD: ${selectedBatch.expiryDate} (Tồn: ${selectedBatch.quantity})` 
+                : 'Chọn lô...'}
+            </Text>
             <MaterialIcons name="arrow-drop-down" size={24} color={THEME.textGray} />
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Lý do xuất */}
@@ -119,6 +183,83 @@ export default function ExportCancelScreen() {
           <Text style={styles.submitBtnText}>Xác nhận Xuất hủy</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Modal chọn thuốc */}
+      <Modal
+        visible={showMedicineModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMedicineModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn thuốc</Text>
+              <TouchableOpacity onPress={() => setShowMedicineModal(false)}>
+                <MaterialIcons name="close" size={24} color={THEME.text} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={medicines}
+              keyExtractor={(item) => item.id}
+              style={styles.modalList}
+              renderItem={({ item }) => {
+                const totalStock = item.batches?.reduce((sum: number, b: any) => sum + b.quantity, 0) || 0;
+                return (
+                  <TouchableOpacity 
+                    style={styles.modalItem}
+                    onPress={() => handleSelectMedicine(item)}
+                  >
+                    <Text style={styles.modalItemName}>{item.name}</Text>
+                    <Text style={styles.modalItemSub}>{item.unit} • Tồn: {totalStock}</Text>
+                  </TouchableOpacity>
+                );
+              }}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>Không có thuốc nào</Text>
+              }
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal chọn batch */}
+      <Modal
+        visible={showBatchModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowBatchModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn lô</Text>
+              <TouchableOpacity onPress={() => setShowBatchModal(false)}>
+                <MaterialIcons name="close" size={24} color={THEME.text} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={selectedMedicine?.batches || []}
+              keyExtractor={(item, index) => item.batchNumber + index}
+              style={styles.modalList}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={styles.modalItem}
+                  onPress={() => handleSelectBatch(item)}
+                >
+                  <Text style={styles.modalItemName}>{item.batchNumber}</Text>
+                  <Text style={styles.modalItemSub}>
+                    HSD: {item.expiryDate} • Tồn: {item.quantity}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>Không có lô nào</Text>
+              }
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -171,4 +312,15 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center' 
   },
   submitBtnText: { color: THEME.white, fontWeight: 'bold', fontSize: 16 },
+
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: THEME.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: THEME.border },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: THEME.text },
+  modalList: { padding: 8 },
+  modalItem: { padding: 16, borderBottomWidth: 1, borderBottomColor: THEME.border },
+  modalItemName: { fontSize: 16, fontWeight: '600', color: THEME.text },
+  modalItemSub: { fontSize: 13, color: THEME.textGray, marginTop: 4 },
+  emptyText: { textAlign: 'center', color: THEME.textGray, padding: 20 },
 });

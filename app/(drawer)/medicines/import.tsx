@@ -1,234 +1,450 @@
+import { useState } from 'react';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Modal, Text, Alert } from 'react-native';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { useTheme } from '@/context/ThemeContext';
+import { dataManager } from '@/services/DataManager';
+import { formatCurrency, formatDate } from '@/utils/formatters';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
-} from 'react-native';
 
-const THEME = {
-  primary: '#137fec',
-  bg: '#f6f7f8',
-  white: '#ffffff',
-  text: '#111418',
-  textGray: '#617589',
-  border: '#dbe0e6',
-  blueBg: '#eff6ff',
-};
+interface ImportBatch {
+  medicineId: string;
+  medicineName: string;
+  quantity: number;
+  unitPrice: number;
+  batchNumber: string;
+  expiryDate: string;
+  supplier: string;
+}
 
-export default function ImportMedicineScreen() {
+export default function ImportScreen() {
   const router = useRouter();
-  const [tab, setTab] = useState<'new' | 'restock'>('new'); // Chế độ tab
+  const { colors, isDark } = useTheme();
 
-  // Form State
-  const [form, setForm] = useState({
-    name: '', sku: '', unit: '', price: '',
-    batchNumber: '', expiryDate: '', quantity: '', supplier: ''
+  const [importBatches, setImportBatches] = useState<ImportBatch[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState({
+    medicineName: '',
+    quantity: '',
+    unitPrice: '',
+    batchNumber: `BATCH-${Date.now()}`,
+    expiryDate: '',
+    supplier: ''
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleSave = () => {
-    // Logic giả lập lưu dữ liệu
-    const message = tab === 'new' 
-      ? 'Đã tạo mã thuốc mới và nhập kho thành công!' 
-      : 'Đã cập nhật số lượng tồn kho thành công!';
-      
-    alert(message);
-    router.back();
+  const handleAddBatch = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.medicineName.trim()) {
+      newErrors.medicineName = 'Tên thuốc không được để trống';
+    }
+    if (!formData.quantity || parseInt(formData.quantity) <= 0) {
+      newErrors.quantity = 'Số lượng phải lớn hơn 0';
+    }
+    if (!formData.unitPrice || parseFloat(formData.unitPrice) <= 0) {
+      newErrors.unitPrice = 'Giá nhập phải lớn hơn 0';
+    }
+    if (!formData.expiryDate) {
+      newErrors.expiryDate = 'Ngày hết hạn không được để trống';
+    }
+    if (!formData.supplier.trim()) {
+      newErrors.supplier = 'Nhà cung cấp không được để trống';
+    }
+
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length === 0) {
+      const batch: ImportBatch = {
+        medicineId: Math.random().toString(),
+        ...formData,
+        quantity: parseInt(formData.quantity),
+        unitPrice: parseFloat(formData.unitPrice),
+      };
+
+      setImportBatches([...importBatches, batch]);
+      setFormData({
+        medicineName: '',
+        quantity: '',
+        unitPrice: '',
+        batchNumber: `BATCH-${Date.now()}`,
+        expiryDate: '',
+        supplier: '',
+      });
+      setErrors({});
+      setShowModal(false);
+    }
   };
 
+  const handleRemoveBatch = (index: number) => {
+    setImportBatches(importBatches.filter((_, i) => i !== index));
+  };
+
+  const handleConfirmImport = () => {
+    if (importBatches.length === 0) {
+      Alert.alert('Lỗi', 'Chưa có batch nào để nhập!');
+      return;
+    }
+
+    // Thêm tất cả batch vào kho
+    importBatches.forEach(batch => {
+      const medicineData = {
+        id: `MED-${Date.now()}-${Math.random()}`,
+        name: batch.medicineName,
+        category: 'Nhập hàng',
+        unit: 'Viên',
+        price: batch.unitPrice * 1.3, // Giá bán = giá nhập * 1.3
+        minStock: 10,
+        batches: [{
+          batchNumber: batch.batchNumber,
+          quantity: batch.quantity,
+          expiryDate: batch.expiryDate,
+          importDate: new Date().toISOString().split('T')[0],
+          importPrice: batch.unitPrice,
+          supplier: batch.supplier,
+        }],
+        createdAt: new Date().toISOString(),
+      };
+      
+      dataManager.addMedicine(medicineData);
+    });
+
+    // Reset
+    setImportBatches([]);
+    Alert.alert('✅ Nhập hàng thành công!', `Đã nhập ${totalQuantity} sản phẩm với tổng giá trị ${formatCurrency(totalImportValue)}`, [
+      { text: 'OK', onPress: () => router.back() }
+    ]);
+  };
+
+  const totalImportValue = importBatches.reduce(
+    (sum, batch) => sum + batch.quantity * batch.unitPrice,
+    0
+  );
+
+  const totalQuantity = importBatches.reduce((sum, batch) => sum + batch.quantity, 0);
+
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    
+    // Header
+    header: { 
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
+      backgroundColor: colors.card, paddingHorizontal: 16, paddingBottom: 16, paddingTop: 50, 
+      borderBottomWidth: 1, borderBottomColor: colors.border 
+    },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text },
+    backBtn: { padding: 4 },
+
+    // Tabs
+    tabContainer: { flexDirection: 'row', padding: 16, gap: 12 },
+    tab: { 
+      flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 8, 
+      backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border 
+    },
+    activeTab: { backgroundColor: colors.primary, borderColor: colors.primary },
+    tabText: { fontWeight: '600', color: colors.text },
+    activeTabText: { color: colors.primary },
+    
+    // Content
+    content: { paddingHorizontal: 16, paddingBottom: 100 },
+    section: { 
+      backgroundColor: colors.card, borderRadius: 12, padding: 16, 
+      marginBottom: 16, borderWidth: 1, borderColor: colors.border 
+    },
+    sectionTitle: { fontSize: 15, fontWeight: 'bold', color: colors.text, marginBottom: 16 },
+    
+    formGroup: { marginBottom: 16 },
+    row: { flexDirection: 'row', gap: 12 },
+    label: { fontSize: 14, fontWeight: '500', color: colors.text, marginBottom: 8 },
+    input: { 
+      height: 48, borderWidth: 1, borderColor: colors.border, borderRadius: 8, 
+      paddingHorizontal: 12, fontSize: 16, backgroundColor: '#FAFAFA' 
+    },
+    searchFake: {
+      height: 48, borderWidth: 1, borderColor: colors.border, borderRadius: 8, 
+      paddingHorizontal: 12, backgroundColor: '#FAFAFA', flexDirection: 'row', alignItems: 'center'
+    },
+    
+    // Footer
+    footer: { 
+      position: 'absolute', bottom: 0, left: 0, right: 0, 
+      backgroundColor: colors.card, padding: 16, borderTopWidth: 1, borderTopColor: colors.border 
+    },
+    saveBtn: { 
+      backgroundColor: colors.primary, borderRadius: 8, height: 48, 
+      alignItems: 'center', justifyContent: 'center' 
+    },
+    saveBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
+
+    // Additional styles
+    title: { fontSize: 20, fontWeight: 'bold', color: colors.text },
+    subtitle: { fontSize: 14, color: colors.text, marginTop: 4 },
+    summaryContainer: { marginVertical: 16 },
+    summaryCard: { padding: 16 },
+    summaryRow: { flexDirection: 'row', justifyContent: 'space-around' },
+    summaryItem: { alignItems: 'center' },
+    summaryLabel: { fontSize: 12, color: colors.text, marginBottom: 8 },
+    summaryValue: { fontSize: 18, fontWeight: 'bold', color: colors.text },
+    addButton: { backgroundColor: colors.primary, marginVertical: 12 },
+    listContainer: { marginBottom: 100 },
+    listTitle: { fontSize: 16, fontWeight: 'bold', color: colors.text, marginBottom: 12 },
+    batchCard: { marginBottom: 12, padding: 12 },
+    batchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    batchInfo: { flex: 1 },
+    batchName: { fontSize: 14, fontWeight: 'bold', color: colors.text },
+    batchMeta: { fontSize: 12, color: colors.text, marginTop: 4 },
+    deleteButton: { padding: 8 },
+    deleteButtonText: { fontSize: 18 },
+    batchDetails: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
+    detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    detailLabel: { fontSize: 12, color: colors.text },
+    detailValue: { fontSize: 12, fontWeight: '600', color: colors.text },
+    confirmButton: { backgroundColor: colors.primary, marginVertical: 12 },
+    emptyState: { padding: 24, alignItems: 'center' },
+    emptyText: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 },
+    emptySubtext: { fontSize: 14, color: colors.text },
+    modalContainer: { flex: 1, backgroundColor: colors.background },
+    modalContent: { paddingBottom: 200 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
+    modalTitle: { fontSize: 18, fontWeight: 'bold', color: colors.text },
+    closeButton: { fontSize: 24, color: colors.text, fontWeight: 'bold' },
+    errorText: { color: '#ef4444', fontSize: 12, marginTop: 4 },
+    inputError: { borderColor: '#ef4444' },
+    buttonGroup: { flexDirection: 'row', gap: 12, padding: 16 },
+    addBatchButton: { flex: 1, backgroundColor: colors.primary },
+    cancelButton: { flex: 1 },
+  });
+
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <MaterialIcons name="arrow-back" size={24} color={THEME.text} />
+        <TouchableOpacity onPress={() => router.push('/medicines' as any)} style={styles.backBtn}>
+          <MaterialIcons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Nhập kho</Text>
-        <TouchableOpacity>
-           <MaterialIcons name="qr-code-scanner" size={24} color={THEME.primary} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Tabs Switcher */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, tab === 'new' && styles.activeTab]} 
-          onPress={() => setTab('new')}
-        >
-          <Text style={[styles.tabText, tab === 'new' && styles.activeTabText]}>Thêm thuốc mới</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, tab === 'restock' && styles.activeTab]} 
-          onPress={() => setTab('restock')}
-        >
-          <Text style={[styles.tabText, tab === 'restock' && styles.activeTabText]}>Nhập hàng cũ</Text>
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Nhập hàng</Text>
+        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        
-        {/* --- FORM THUỐC MỚI --- */}
-        {tab === 'new' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>1. Thông tin thuốc</Text>
-            
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Tên thuốc <Text style={{color: 'red'}}>*</Text></Text>
-              <TextInput 
-                style={styles.input} placeholder="Ví dụ: Panadol Extra" 
-                value={form.name} onChangeText={t => setForm({...form, name: t})}
-              />
-            </View>
-
-            <View style={styles.row}>
-              <View style={[styles.formGroup, {flex: 1}]}>
-                <Text style={styles.label}>Mã SKU (Barcode)</Text>
-                <TextInput 
-                  style={styles.input} placeholder="Scan hoặc nhập" 
-                  value={form.sku} onChangeText={t => setForm({...form, sku: t})}
-                />
+        {/* Summary */}
+        <View style={styles.summaryContainer}>
+          <Card style={styles.summaryCard}>
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryItem}>
+                <ThemedText style={styles.summaryLabel}>Tổng Số Lượng</ThemedText>
+                <ThemedText style={styles.summaryValue}>{totalQuantity}</ThemedText>
               </View>
-              <View style={[styles.formGroup, {width: 100}]}>
-                <Text style={styles.label}>Đơn vị</Text>
-                <TextInput 
-                  style={styles.input} placeholder="Hộp/Vỉ" 
-                  value={form.unit} onChangeText={t => setForm({...form, unit: t})}
-                />
+              <View style={styles.summaryItem}>
+                <ThemedText style={styles.summaryLabel}>Tổng Tiền</ThemedText>
+                <ThemedText style={[styles.summaryValue, { color: '#10b981' }]}>
+                  {formatCurrency(totalImportValue)}
+                </ThemedText>
               </View>
             </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Giá bán niêm yết</Text>
-              <TextInput 
-                style={styles.input} placeholder="0" keyboardType="numeric"
-                value={form.price} onChangeText={t => setForm({...form, price: t})}
-              />
-            </View>
-          </View>
-        )}
-
-        {/* --- FORM NHẬP HÀNG CŨ (Chỉ hiện khi chọn tab Restock) --- */}
-        {tab === 'restock' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Chọn thuốc cần nhập</Text>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Tìm kiếm thuốc</Text>
-              <View style={styles.searchFake}>
-                 <MaterialIcons name="search" size={20} color={THEME.textGray} />
-                 <Text style={{color: THEME.textGray, marginLeft: 8}}>Gõ tên hoặc quét mã vạch...</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* --- FORM LÔ HÀNG (Dùng chung cho cả 2 tab) --- */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>2. Thông tin lô nhập</Text>
-          
-          <View style={styles.formGroup}>
-             <Text style={styles.label}>Nhà cung cấp</Text>
-             <TextInput 
-                style={styles.input} placeholder="Chọn nhà cung cấp..." 
-                value={form.supplier} onChangeText={t => setForm({...form, supplier: t})}
-              />
-          </View>
-
-          <View style={styles.row}>
-            <View style={[styles.formGroup, {flex: 1}]}>
-              <Text style={styles.label}>Số lô (Batch No)</Text>
-              <TextInput 
-                style={styles.input} placeholder="L00..." 
-                value={form.batchNumber} onChangeText={t => setForm({...form, batchNumber: t})}
-              />
-            </View>
-            <View style={[styles.formGroup, {flex: 1}]}>
-              <Text style={styles.label}>Hạn sử dụng</Text>
-              <TextInput 
-                style={styles.input} placeholder="DD/MM/YYYY" 
-                value={form.expiryDate} onChangeText={t => setForm({...form, expiryDate: t})}
-              />
-            </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Số lượng nhập <Text style={{color: 'red'}}>*</Text></Text>
-            <TextInput 
-              style={[styles.input, {borderColor: THEME.primary, borderWidth: 1.5, fontWeight: 'bold'}]} 
-              placeholder="0" keyboardType="numeric"
-              value={form.quantity} onChangeText={t => setForm({...form, quantity: t})}
-            />
-          </View>
+          </Card>
         </View>
 
+        {/* Add Batch Button */}
+        <Button
+          title="+ Thêm Lô Hàng"
+          onPress={() => setShowModal(true)}
+          style={styles.addButton}
+        />
+
+        {/* Import Batches List */}
+        {importBatches.length > 0 ? (
+          <View style={styles.listContainer}>
+            <ThemedText style={styles.listTitle}>Danh sách lô hàng ({importBatches.length})</ThemedText>
+            {importBatches.map((batch, index) => (
+              <Card key={index} style={styles.batchCard}>
+                <View style={styles.batchHeader}>
+                  <View style={styles.batchInfo}>
+                    <ThemedText style={styles.batchName}>{batch.medicineName}</ThemedText>
+                    <ThemedText style={styles.batchMeta}>
+                      Mã lô: {batch.batchNumber}
+                    </ThemedText>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveBatch(index)}
+                    style={styles.deleteButton}
+                  >
+                    <ThemedText style={styles.deleteButtonText}>🗑️</ThemedText>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.batchDetails}>
+                  <View style={styles.detailRow}>
+                    <ThemedText style={styles.detailLabel}>Số lượng:</ThemedText>
+                    <ThemedText style={styles.detailValue}>{batch.quantity}</ThemedText>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <ThemedText style={styles.detailLabel}>Giá nhập:</ThemedText>
+                    <ThemedText style={styles.detailValue}>
+                      {formatCurrency(batch.unitPrice)}/đơn vị
+                    </ThemedText>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <ThemedText style={styles.detailLabel}>Tổng tiền:</ThemedText>
+                    <ThemedText style={[styles.detailValue, { fontWeight: '700' }]}>
+                      {formatCurrency(batch.quantity * batch.unitPrice)}
+                    </ThemedText>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <ThemedText style={styles.detailLabel}>HSD:</ThemedText>
+                    <ThemedText style={styles.detailValue}>{batch.expiryDate}</ThemedText>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <ThemedText style={styles.detailLabel}>Nhà cung cấp:</ThemedText>
+                    <ThemedText style={styles.detailValue}>{batch.supplier}</ThemedText>
+                  </View>
+                </View>
+              </Card>
+            ))}
+
+            {/* Confirm Button */}
+            <Button
+              title={`✅ Xác Nhận Nhập Hàng (${totalQuantity} sản phẩm)`}
+              onPress={handleConfirmImport}
+              style={styles.confirmButton}
+            />
+          </View>
+        ) : (
+          <Card style={styles.emptyState}>
+            <ThemedText style={styles.emptyText}>
+              Chưa có lô hàng nào được thêm
+            </ThemedText>
+            <ThemedText style={styles.emptySubtext}>
+              Nhấn nút "Thêm Lô Hàng" để bắt đầu
+            </ThemedText>
+          </Card>
+        )}
       </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-          <Text style={styles.saveBtnText}>
-            {tab === 'new' ? 'Lưu & Tạo mới' : 'Xác nhận nhập kho'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+      {/* Modal Thêm Lô Hàng */}
+      <Modal
+        visible={showModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowModal(false)}
+      >
+        <ThemedView style={styles.modalContainer}>
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Thêm Lô Hàng Mới</ThemedText>
+              <TouchableOpacity onPress={() => setShowModal(false)}>
+                <ThemedText style={styles.closeButton}>✕</ThemedText>
+              </TouchableOpacity>
+            </View>
+
+            {/* Tên Thuốc */}
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Tên Thuốc *</ThemedText>
+              <Input
+                placeholder="Tên thuốc"
+                value={formData.medicineName}
+                onChangeText={(value) =>
+                  setFormData({ ...formData, medicineName: value })
+                }
+                style={[
+                  styles.input,
+                  errors.medicineName && styles.inputError,
+                ]}
+              />
+              {errors.medicineName && (
+                <ThemedText style={styles.errorText}>{errors.medicineName}</ThemedText>
+              )}
+            </View>
+
+            {/* Số Lượng */}
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Số Lượng *</ThemedText>
+              <Input
+                placeholder="0"
+                value={formData.quantity}
+                onChangeText={(value) => setFormData({ ...formData, quantity: value })}
+                keyboardType="number-pad"
+                style={[styles.input, errors.quantity && styles.inputError]}
+              />
+              {errors.quantity && (
+                <ThemedText style={styles.errorText}>{errors.quantity}</ThemedText>
+              )}
+            </View>
+
+            {/* Giá Nhập */}
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Giá Nhập (₫) *</ThemedText>
+              <Input
+                placeholder="0"
+                value={formData.unitPrice}
+                onChangeText={(value) => setFormData({ ...formData, unitPrice: value })}
+                keyboardType="decimal-pad"
+                style={[styles.input, errors.unitPrice && styles.inputError]}
+              />
+              {errors.unitPrice && (
+                <ThemedText style={styles.errorText}>{errors.unitPrice}</ThemedText>
+              )}
+            </View>
+
+            {/* Mã Lô */}
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Mã Lô (Tự động)</ThemedText>
+              <Input
+                placeholder="Tự động tạo"
+                value={formData.batchNumber}
+                editable={false}
+                style={[styles.input, { backgroundColor: isDark ? '#1f2937' : '#e5e7eb', color: '#9ca3af' }]}
+              />
+            </View>
+
+            {/* Ngày Hết Hạn */}
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Ngày Hết Hạn (YYYY-MM-DD) *</ThemedText>
+              <Input
+                placeholder="2025-12-31"
+                value={formData.expiryDate}
+                onChangeText={(value) => setFormData({ ...formData, expiryDate: value })}
+                style={[styles.input, errors.expiryDate && styles.inputError]}
+              />
+              {errors.expiryDate && (
+                <ThemedText style={styles.errorText}>{errors.expiryDate}</ThemedText>
+              )}
+            </View>
+
+            {/* Nhà Cung Cấp */}
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Nhà Cung Cấp *</ThemedText>
+              <Input
+                placeholder="Tên nhà cung cấp"
+                value={formData.supplier}
+                onChangeText={(value) => setFormData({ ...formData, supplier: value })}
+                style={[styles.input, errors.supplier && styles.inputError]}
+              />
+              {errors.supplier && (
+                <ThemedText style={styles.errorText}>{errors.supplier}</ThemedText>
+              )}
+            </View>
+
+            {/* Buttons */}
+            <View style={styles.buttonGroup}>
+              <Button
+                title="Thêm Lô Hàng"
+                onPress={handleAddBatch}
+                style={styles.addBatchButton}
+              />
+              <Button
+                title="Hủy"
+                onPress={() => setShowModal(false)}
+                style={[styles.cancelButton, { backgroundColor: '#6b7280' }]}
+              />
+            </View>
+          </ScrollView>
+        </ThemedView>
+      </Modal>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: THEME.bg },
-  
-  // Header
-  header: { 
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
-    backgroundColor: THEME.white, paddingHorizontal: 16, paddingBottom: 16, paddingTop: 50, 
-    borderBottomWidth: 1, borderBottomColor: THEME.border 
-  },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: THEME.text },
-  backBtn: { padding: 4 },
-
-  // Tabs
-  tabContainer: { flexDirection: 'row', padding: 16, gap: 12 },
-  tab: { 
-    flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 8, 
-    backgroundColor: THEME.white, borderWidth: 1, borderColor: THEME.border 
-  },
-  activeTab: { backgroundColor: THEME.blueBg, borderColor: THEME.primary },
-  tabText: { fontWeight: '600', color: THEME.textGray },
-  activeTabText: { color: THEME.primary },
-  
-  // Content
-  content: { paddingHorizontal: 16, paddingBottom: 100 },
-  section: { 
-    backgroundColor: THEME.white, borderRadius: 12, padding: 16, 
-    marginBottom: 16, borderWidth: 1, borderColor: THEME.border 
-  },
-  sectionTitle: { fontSize: 15, fontWeight: 'bold', color: THEME.text, marginBottom: 16 },
-  
-  formGroup: { marginBottom: 16 },
-  row: { flexDirection: 'row', gap: 12 },
-  label: { fontSize: 14, fontWeight: '500', color: THEME.text, marginBottom: 8 },
-  input: { 
-    height: 48, borderWidth: 1, borderColor: THEME.border, borderRadius: 8, 
-    paddingHorizontal: 12, fontSize: 16, backgroundColor: '#FAFAFA' 
-  },
-  searchFake: {
-    height: 48, borderWidth: 1, borderColor: THEME.border, borderRadius: 8, 
-    paddingHorizontal: 12, backgroundColor: '#FAFAFA', flexDirection: 'row', alignItems: 'center'
-  },
-  
-  // Footer
-  footer: { 
-    position: 'absolute', bottom: 0, left: 0, right: 0, 
-    backgroundColor: THEME.white, padding: 16, borderTopWidth: 1, borderTopColor: THEME.border 
-  },
-  saveBtn: { 
-    backgroundColor: THEME.primary, borderRadius: 8, height: 48, 
-    alignItems: 'center', justifyContent: 'center' 
-  },
-  saveBtnText: { color: THEME.white, fontWeight: 'bold', fontSize: 16 },
-});

@@ -8,6 +8,7 @@ export interface Employee {
   id: string;
   name: string;
   username: string;
+  email: string;
   role: 'admin' | 'manager' | 'staff';
   phone: string;
   status: 'active' | 'inactive';
@@ -75,10 +76,17 @@ class DataManager {
   ];
 
   constructor() {
-    // --- SỬA LỖI TẠI ĐÂY: Thêm 'as unknown' để bỏ qua lỗi thiếu trường ---
+    // Load dữ liệu ban đầu từ pharmacy.json
     this.data = pharmacyData as unknown as PharmacyData;
     
+    // Ưu tiên load từ localStorage (nếu có dữ liệu đã lưu)
     this.loadFromLocalStorage();
+    
+    // Nếu không có data trong localStorage, dùng pharmacy.json và save lại
+    if (typeof window !== 'undefined' && !localStorage.getItem('pharmacyData')) {
+      this.saveToLocalStorage();
+    }
+    
     this.initializeMissingData(); 
   }
 
@@ -88,9 +96,17 @@ class DataManager {
       const savedData = localStorage.getItem('pharmacyData');
       if (savedData) {
         try {
-          this.data = JSON.parse(savedData);
+          const parsed = JSON.parse(savedData);
+          // Kiểm tra xem có đủ thuốc không (nếu < 10 thuốc thì reload từ pharmacy.json)
+          if (!parsed.medicines || parsed.medicines.length < 10) {
+            console.log('Reloading data from pharmacy.json...');
+            this.data = pharmacyData as unknown as PharmacyData;
+          } else {
+            this.data = parsed;
+          }
         } catch (error) {
           console.error('Error loading data:', error);
+          this.data = pharmacyData as unknown as PharmacyData;
         }
       }
     }
@@ -154,6 +170,10 @@ class DataManager {
   }
 
   // --- EMPLOYEES ---
+  getEmployees() {
+    return this.data.employees || [];
+  }
+
   getAllEmployees() { 
       return this.data.employees || []; 
   }
@@ -182,8 +202,37 @@ class DataManager {
   }
 
   // --- MEDICINES ---
+  getMedicines(): Medicine[] {
+    return this.enrichMedicines(this.data.medicines);
+  }
+
   getAllMedicines(): Medicine[] {
-    return this.data.medicines;
+    return this.enrichMedicines(this.data.medicines);
+  }
+
+  // Helper: Thêm price và unitName vào medicine
+  private enrichMedicines(medicines: Medicine[]): any[] {
+    return medicines.map(med => {
+      // Lấy giá từ batch đầu tiên
+      const price = med.batches && med.batches.length > 0 
+        ? med.batches[0].sellingPrice 
+        : 0;
+      
+      // Lấy tên đơn vị từ units
+      const unitObj = this.data.units?.find((u: any) => u.id === med.unit);
+      const unitName = unitObj ? unitObj.name : med.unit;
+      
+      return {
+        ...med,
+        price,
+        unit: unitName
+      };
+    });
+  }
+
+  saveMedicines(medicines: Medicine[]): void {
+    this.data.medicines = medicines;
+    this.saveToLocalStorage();
   }
 
   getMedicineById(id: string): Medicine | undefined {
@@ -240,8 +289,9 @@ class DataManager {
 
   getLowStockMedicines(): Medicine[] {
     return this.data.medicines.filter((m) => {
-      const totalStock = m.batches.reduce((sum, b) => sum + b.quantity, 0);
-      return totalStock <= m.minStock;
+      const batches = m.batches || [];
+      const totalStock = batches.reduce((sum, b) => sum + b.quantity, 0);
+      return totalStock <= (m.minStock || 10);
     });
   }
 
@@ -249,12 +299,13 @@ class DataManager {
     const now = new Date();
     const thresholdDate = new Date(now.getTime() + daysThreshold * 24 * 60 * 60 * 1000);
 
-    return this.data.medicines.filter((m) =>
-      m.batches.some((batch) => {
+    return this.data.medicines.filter((m) => {
+      const batches = m.batches || [];
+      return batches.some((batch) => {
         const expiryDate = new Date(batch.expiryDate);
         return expiryDate <= thresholdDate && expiryDate >= now;
-      })
-    );
+      });
+    });
   }
 
   // --- CUSTOMERS ---

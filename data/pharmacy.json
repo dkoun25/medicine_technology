@@ -40,6 +40,7 @@
       "dosage": "1-2 viên/lần, 3-4 lần/ngày",
       "barcode": "8934588012345",
       "minStock": 10,
+      "image": "https://cdn.medigoapp.com/product/panadol_extra.jpg",
       "batches": [
         {
           "id": "batch_1",
@@ -130,6 +131,7 @@
       "dosage": "1 viên/ngày",
       "barcode": "8934588045678",
       "minStock": 20,
+      "image": "https://cdn.medigoapp.com/product/vitamin_c.jpg",
       "batches": [
         {
           "id": "batch_4",
@@ -145,6 +147,192 @@
       ],
       "createdAt": "2024-02-20T00:00:00Z",
       "updatedAt": "2024-03-01T00:00:00Z"
+    },
+    {
+      "id": "med_5",
+      "name": "Amoxicillin 500mg",
+      "activeIngredient": "Amoxicillin 500mg",
+      "category": "cat_1",
+      "unit": "unit_2",
+      "manufacturer": "Imexpharm",
+      "country": "Việt Nam",
+      "registrationNumber": "VN-56789-21",
+      "description": "Kháng sinh điều trị nhiễm khuẩn",
+      "usage": "Uống sau ăn",
+      "dosage": "1 viên x 3 lần/ngày",
+      "barcode": "8934588056789",
+      "minStock": 15,
+      "image": "https://cdn.medigoapp.com/product/amoxicillin.jpg",
+      "batches": [
+        {
+          "id": "batch_5",
+          "batchNumber": "AMO-2024",
+          "expiryDate": "2026-08-30T00:00:00Z",
+          "quantity": 40,
+          "costPrice": 12000,
+          "sellingPrice": 18000,
+          "supplierId": "sup_1",
+          "importDate": "2024-04-15T00:00:00Z",
+          "location": "Kệ A3"
+        }
+      ],
+      "createdAt": "2024-04-10T00:00:00Z",
+      "updatedAt": "2024-04-15T00:00:00Z"
+    },
+    {
+      "id": "med_6",
+      "name": "ORS 250ml",
+      "activeIngredient": "Natri clorua, Kali clorua, Glucose",
+      "category": "cat_4",
+      "unit": "unit_6",
+      "manufacturer": "OPC Pharma",
+      "country": "Việt Nam",
+      "registrationNumber": "VN-67890-19",
+      "description": "Dung dịch điện giải đường uống",
+      "usage": "Uống khi mất nước",
+      "dosage": "Uống từ từ theo nhu cầu",
+      "barcode": "8934588067890",
+      "minStock": 25,
+      "image": "https://cdn.medigoapp.com/product/ors.jpg",
+      "batches": [
+        {
+          "id": "batch_6",
+          "batchNumber": "ORS-2025",
+          "expiryDate": "2026-12-31T00:00:00Z",
+          "quantity": 60,
+          "costPrice": 5000,
+          "sellingPrice": 8000,
+          "supplierId": "sup_2",
+          "importDate": "2024-05-01T00:00:00Z",
+          "location": "Kệ B2"
+        }
+      ],
+      "createdAt": "2024-04-25T00:00:00Z",
+      "updatedAt": "2024-05-01T00:00:00Z"
+    },
+    {
+      "id": "med_7",
+      "name": "Cetrizine 10mg",
+      "activeIngredient": "Cetirizine HCl 10mg",
+      "category": "cat_7",
+      "unit": "unit_2",
+      "manufacturer": "Pymepharco",
+      "country": "Việt Nam",
+      "registrationNumber": "VN-78901-20",
+      "description": "Thuốc chống dị ứng",
+      "usage": "Uống trước khi đi ngủ",
+      "dosage": "1 viên/ngày",
+      "barcode": "8934588078901",
+      "minStock": 10,
+      "image": "https://cdn.medigoapp.com/product/cetrizine.jpg",
+      "batches": [
+        {
+          "id": "batch_7",
+          "batchNumber": "CET-2024",
+          "expiryDate": "2026-05-20T00:00:00Z",
+          "quantity": 30,
+          "costPrice": 10000,
+          "sellingPrice": 15000,
+          "supplierId": "sup_1",
+          "importDate": "2024-03-20T00:00:00Z",
+          "location": "Kệ C2"
+        }
+      ],
+      "createdAt": "2024-03-15T00:00:00Z",
+      "updatedAt": "2024-03-20T00:00:00Z"
+    },
+    {
+      "id": "med_8",
+      "name": "Salbutamol 100mcg",
+      "activeIngredient": "Salbutamol 100mcg/liều",
+      "category": "cat_7",
+      "unit": "unit_4",
+      "manufacturer": "GSK",
+      "country": "Singapo",
+      "registrationNumber": "VN-89012-18",
+      "description": "Thuốc giãn phế quản",
+      "usage": "Xịt hít khi khó thở",
+      "dosage": "1-2 nhát/lần khi cần",
+      "barcode": "8934588089012",
+      "minStock": 5,
+      "image": "https://cdn.medigoapp.com/product/salbutamol.jpg",
+      "batches": [
+        {
+          "id": "batch_8",
+          "batchNumber": "SAL-2025",
+          "expiryDate": "2026-11-30T00:00:00Z",
+          "quantity": 12,
+          "costPrice": 45000,
+          "sellingPrice": 65000,
+          "supplierId": "sup_1",
+          "importDate": "2024-06-10T00:00:00Z",
+          "location": "Kệ D1"
+        }
+      ],
+      "createdAt": "2024-06-05T00:00:00Z",
+      "updatedAt": "2024-06-10T00:00:00Z"
+    },
+    {
+      "id": "med_9",
+      "name": "Mebo 15g",
+      "activeIngredient": "Beta-sitosterol, Berberine",
+      "category": "cat_5",
+      "unit": "unit_5",
+      "manufacturer": "Shantou",
+      "country": "Trung Quốc",
+      "registrationNumber": "VN-90123-17",
+      "description": "Thuốc bôi điều trị bỏng, vết thương",
+      "usage": "Bôi ngoài da",
+      "dosage": "Bôi 2-3 lần/ngày",
+      "barcode": "8934588090123",
+      "minStock": 8,
+      "image": "https://cdn.medigoapp.com/product/mebo.jpg",
+      "batches": [
+        {
+          "id": "batch_9",
+          "batchNumber": "MEB-2024",
+          "expiryDate": "2026-09-15T00:00:00Z",
+          "quantity": 18,
+          "costPrice": 28000,
+          "sellingPrice": 42000,
+          "supplierId": "sup_2",
+          "importDate": "2024-05-20T00:00:00Z",
+          "location": "Kệ E1"
+        }
+      ],
+      "createdAt": "2024-05-15T00:00:00Z",
+      "updatedAt": "2024-05-20T00:00:00Z"
+    },
+    {
+      "id": "med_10",
+      "name": "Eugica",
+      "activeIngredient": "Cao khô lá Bạch đàn 62.5mg",
+      "category": "cat_7",
+      "unit": "unit_2",
+      "manufacturer": "Traphaco",
+      "country": "Việt Nam",
+      "registrationNumber": "VN-01234-16",
+      "description": "Thuốc ho, long đờm",
+      "usage": "Uống sau ăn",
+      "dosage": "2 viên x 3 lần/ngày",
+      "barcode": "8934588001234",
+      "minStock": 12,
+      "image": "https://cdn.medigoapp.com/product/eugica.jpg",
+      "batches": [
+        {
+          "id": "batch_10",
+          "batchNumber": "EUG-2024",
+          "expiryDate": "2026-07-31T00:00:00Z",
+          "quantity": 35,
+          "costPrice": 16000,
+          "sellingPrice": 24000,
+          "supplierId": "sup_2",
+          "importDate": "2024-04-05T00:00:00Z",
+          "location": "Kệ C3"
+        }
+      ],
+      "createdAt": "2024-04-01T00:00:00Z",
+      "updatedAt": "2024-04-05T00:00:00Z"
     }
   ],
   "suppliers": [

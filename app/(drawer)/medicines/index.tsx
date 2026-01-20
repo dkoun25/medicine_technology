@@ -4,29 +4,26 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-
-// --- ĐỊNH NGHĨA THEME (Fix lỗi import) ---
-const THEME = {
-  primary: '#137fec',
-  bg: '#f6f7f8',
-  white: '#ffffff',
-  text: '#111418',
-  textGray: '#617589',
-  border: '#dbe0e6',
-  red: '#ef4444',
-  redBg: '#fef2f2',
-  orange: '#f97316',
-  orangeBg: '#fff7ed',
-  green: '#22c55e',
-  greenBg: '#f0fdf4',
-  blueBg: '#eff6ff',
-};
+import { useTheme } from '@/context/ThemeContext';
 
 export default function MedicinesScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
   const [medicines, setMedicines] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredMedicines, setFilteredMedicines] = useState<any[]>([]);
+
+  // Định nghĩa các màu semantic
+  const SEMANTIC = {
+    red: '#ef4444',
+    redBg: isDark ? '#450a0a' : '#fef2f2',
+    orange: '#f97316',
+    orangeBg: isDark ? '#431407' : '#fff7ed',
+    green: '#22c55e',
+    greenBg: isDark ? '#052e16' : '#f0fdf4',
+    blueBg: isDark ? '#172554' : '#eff6ff',
+    textGray: isDark ? '#9ca3af' : '#617589',
+  };
 
   // 1. Load dữ liệu ban đầu
   useEffect(() => {
@@ -52,9 +49,9 @@ export default function MedicinesScreen() {
 
   // 3. Helper tính trạng thái tồn kho
   const getStockStatus = (quantity: number) => {
-    if (quantity === 0) return { label: 'Hết hàng', color: THEME.red, bg: THEME.redBg };
-    if (quantity <= 10) return { label: 'Sắp hết', color: THEME.orange, bg: THEME.orangeBg };
-    return { label: 'Còn hàng', color: THEME.green, bg: THEME.greenBg };
+    if (quantity === 0) return { label: 'Hết hàng', color: SEMANTIC.red, bg: SEMANTIC.redBg };
+    if (quantity <= 10) return { label: 'Sắp hết', color: SEMANTIC.orange, bg: SEMANTIC.orangeBg };
+    return { label: 'Còn hàng', color: SEMANTIC.green, bg: SEMANTIC.greenBg };
   };
 
   // 4. Render từng item thuốc
@@ -75,7 +72,7 @@ export default function MedicinesScreen() {
         >
           {/* Cột trái: Icon */}
           <View style={styles.iconContainer}>
-            <MaterialIcons name="medication" size={28} color={THEME.primary} />
+            <MaterialIcons name="medication" size={28} color={colors.primary} />
           </View>
 
           {/* Cột phải: Thông tin */}
@@ -106,111 +103,60 @@ export default function MedicinesScreen() {
     );
   };
 
-  return (
-    <View style={styles.container}>
-      {/* --- HEADER --- */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text style={styles.headerTitle}>Danh sách thuốc</Text>
-          <TouchableOpacity 
-            style={styles.addButton} 
-            onPress={() => router.push('/medicines/add' as any)}
-            activeOpacity={0.8}
-          >
-            <MaterialIcons name="add" size={24} color={THEME.white} />
-            <Text style={styles.addButtonText}>Thêm mới</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.searchContainer}>
-          <MaterialIcons name="search" size={20} color={THEME.textGray} />
-          <TextInput 
-            style={styles.searchInput}
-            placeholder="Tìm tên thuốc, hoạt chất, SKU..."
-            placeholderTextColor={THEME.textGray}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <MaterialIcons name="close" size={20} color={THEME.textGray} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* --- LIST VIEW --- */}
-      <FlatList
-        data={filteredMedicines}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <MaterialIcons name="search-off" size={48} color={THEME.border} />
-            <Text style={styles.emptyText}>Không tìm thấy thuốc nào</Text>
-          </View>
-        }
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: THEME.bg 
-  },
-  
-  // Header Styles
-  header: { 
-    backgroundColor: THEME.white, 
-    paddingHorizontal: 16, 
-    paddingBottom: 16, 
-    paddingTop: 50, 
-    borderBottomWidth: 1, 
-    borderBottomColor: THEME.border 
-  },
-  headerTop: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 16 
-  },
-  headerTitle: { 
-    fontSize: 24, 
-    fontWeight: 'bold', 
-    color: THEME.text 
-  },
-  addButton: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: THEME.primary, 
-    paddingHorizontal: 12, 
-    paddingVertical: 8, 
-    borderRadius: 8, 
-    gap: 4 
-  },
-  addButtonText: { 
-    color: THEME.white, 
-    fontWeight: '600', 
-    fontSize: 14 
-  },
-  searchContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: '#f0f2f4', 
-    borderRadius: 8, 
-    paddingHorizontal: 12, 
-    height: 44 
-  },
-  searchInput: { 
-    flex: 1, 
-    marginLeft: 8, 
-    fontSize: 14, 
-    color: THEME.text 
-  },
+  const styles = StyleSheet.create({
+    container: { 
+      flex: 1, 
+      backgroundColor: colors.background 
+    },
+    
+    // Header Styles
+    header: { 
+      backgroundColor: colors.card, 
+      paddingHorizontal: 16, 
+      paddingBottom: 16, 
+      paddingTop: 50, 
+      borderBottomWidth: 1, 
+      borderBottomColor: colors.border 
+    },
+    headerTop: { 
+      flexDirection: 'row', 
+      justifyContent: 'space-between', 
+      alignItems: 'center', 
+      marginBottom: 16 
+    },
+    headerTitle: { 
+      fontSize: 24, 
+      fontWeight: 'bold', 
+      color: colors.text 
+    },
+    addButton: { 
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      backgroundColor: colors.primary, 
+      paddingHorizontal: 12, 
+      paddingVertical: 8, 
+      borderRadius: 8, 
+      gap: 4 
+    },
+    addButtonText: { 
+      color: colors.card, 
+      fontWeight: '600', 
+      fontSize: 14 
+    },
+    searchContainer: { 
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      backgroundColor: isDark ? '#333333' : '#f0f2f4', 
+      borderRadius: 8, 
+      paddingHorizontal: 12, 
+      height: 44 
+    },
+    searchInput: { 
+      flex: 1, 
+      marginLeft: 8, 
+      fontSize: 14, 
+      color: colors.text 
+    },
 
   // List Styles
   listContent: { 
@@ -221,11 +167,11 @@ const styles = StyleSheet.create({
   // Card Styles
   card: { 
     flexDirection: 'row',
-    backgroundColor: THEME.white, 
+    backgroundColor: colors.card, 
     borderRadius: 12, 
     padding: 12, 
     borderWidth: 1, 
-    borderColor: THEME.border, 
+    borderColor: colors.border, 
     shadowColor: "#000", 
     shadowOffset: { width: 0, height: 1 }, 
     shadowOpacity: 0.05, 
@@ -236,7 +182,7 @@ const styles = StyleSheet.create({
     width: 56, 
     height: 56, 
     borderRadius: 8, 
-    backgroundColor: THEME.blueBg, 
+    backgroundColor: SEMANTIC.blueBg, 
     alignItems: 'center', 
     justifyContent: 'center',
     marginRight: 12
@@ -254,17 +200,17 @@ const styles = StyleSheet.create({
   medName: { 
     fontSize: 16, 
     fontWeight: '600', 
-    color: THEME.text,
+    color: colors.text,
     marginBottom: 2
   },
   medSku: { 
     fontSize: 12, 
-    color: THEME.textGray 
+    color: SEMANTIC.textGray 
   },
   medPrice: { 
     fontSize: 15, 
     fontWeight: '700', 
-    color: THEME.primary 
+    color: colors.primary 
   },
   bottomRow: {
     flexDirection: 'row',
@@ -272,14 +218,14 @@ const styles = StyleSheet.create({
     gap: 8
   },
   unitBadge: {
-    backgroundColor: '#f0f2f4',
+    backgroundColor: isDark ? '#333333' : '#f0f2f4',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4
   },
   unitText: {
     fontSize: 12,
-    color: THEME.textGray
+    color: SEMANTIC.textGray
   },
   stockBadge: {
     flexDirection: 'row',
@@ -307,7 +253,58 @@ const styles = StyleSheet.create({
     gap: 12
   },
   emptyText: {
-    color: THEME.textGray,
+    color: SEMANTIC.textGray,
     fontSize: 14
   }
 });
+
+  return (
+    <View style={styles.container}>
+      {/* --- HEADER --- */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>Danh sách thuốc</Text>
+          <TouchableOpacity 
+            style={styles.addButton} 
+            onPress={() => router.push('/medicines/add' as any)}
+            activeOpacity={0.8}
+          >
+            <MaterialIcons name="add" size={24} color={colors.card} />
+            <Text style={styles.addButtonText}>Thêm mới</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.searchContainer}>
+          <MaterialIcons name="search" size={20} color={SEMANTIC.textGray} />
+          <TextInput 
+            style={styles.searchInput}
+            placeholder="Tìm tên thuốc, hoạt chất, SKU..."
+            placeholderTextColor={SEMANTIC.textGray}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <MaterialIcons name="close" size={20} color={SEMANTIC.textGray} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* --- LIST VIEW --- */}
+      <FlatList
+        data={filteredMedicines}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <MaterialIcons name="search-off" size={48} color={colors.border} />
+            <Text style={styles.emptyText}>Không tìm thấy thuốc nào</Text>
+          </View>
+        }
+      />
+    </View>
+  );
+}

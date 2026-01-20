@@ -2,7 +2,7 @@ import { dataManager } from '@/services/DataManager';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View, Alert, Modal, TextInput } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 // --- THEME ---
@@ -24,12 +24,77 @@ const THEME = {
 export default function ExpiringMedicinesScreen() {
   const router = useRouter();
   const [expiringList, setExpiringList] = useState<any[]>([]);
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [returnQty, setReturnQty] = useState('');
+  const [returnReason, setReturnReason] = useState('');
 
-  useEffect(() => {
-    // Lấy thuốc hết hạn trong 60 ngày tới (Mock logic)
+  const loadData = () => {
     const data = dataManager.getExpiringMedicines ? dataManager.getExpiringMedicines(60) : [];
     setExpiringList(data);
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
+
+  const handleReturn = (item: any) => {
+    setSelectedItem(item);
+    setReturnQty('');
+    setReturnReason('Hết hạn sử dụng');
+    setShowReturnModal(true);
+  };
+
+  const confirmReturn = () => {
+    if (!returnQty || parseInt(returnQty) <= 0) {
+      Alert.alert('Lỗi', 'Vui lòng nhập số lượng đổi trả hợp lệ');
+      return;
+    }
+    
+    const batch = selectedItem?.batches?.[0];
+    if (batch && parseInt(returnQty) > batch.quantity) {
+      Alert.alert('Lỗi', `Số lượng đổi trả không được vượt quá ${batch.quantity}`);
+      return;
+    }
+
+    // Cập nhật số lượng trong kho
+    if (selectedItem && batch) {
+      const updatedBatches = selectedItem.batches.map((b: any) => {
+        if (b.batchNumber === batch.batchNumber) {
+          return { ...b, quantity: b.quantity - parseInt(returnQty) };
+        }
+        return b;
+      }).filter((b: any) => b.quantity > 0);
+
+      dataManager.updateMedicine(selectedItem.id, { batches: updatedBatches });
+      
+      Alert.alert(
+        '✅ Thành công',
+        `Đã đổi trả ${returnQty} ${selectedItem.unit || 'đơn vị'} ${selectedItem.name}\nLý do: ${returnReason}`,
+        [{ text: 'OK', onPress: loadData }]
+      );
+    }
+
+    setShowReturnModal(false);
+    setSelectedItem(null);
+  };
+
+  const handleMarkProcessed = (item: any) => {
+    Alert.alert(
+      'Xác nhận',
+      `Đánh dấu "${item.name}" đã được xử lý?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xác nhận',
+          onPress: () => {
+            // Có thể thêm trường "processed" vào medicine hoặc xóa batch
+            Alert.alert('✅ Đã đánh dấu', 'Thuốc đã được xử lý');
+          }
+        }
+      ]
+    );
+  };
 
   const renderItem = ({ item, index }: { item: any; index: number }) => {
     // Lấy batch hết hạn sớm nhất để hiển thị
@@ -80,11 +145,11 @@ export default function ExpiringMedicinesScreen() {
 
             {/* Nút hành động nhanh */}
             <View style={{flexDirection: 'row', gap: 8}}>
-               <TouchableOpacity style={styles.secondaryBtn}>
+               <TouchableOpacity style={styles.secondaryBtn} onPress={() => handleReturn(item)}>
                   <Text style={styles.secondaryBtnText}>Đổi trả</Text>
                </TouchableOpacity>
-               <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push(`/medicines/${item.id}` as any)}>
-                  <Text style={styles.primaryBtnText}>Chi tiết</Text>
+               <TouchableOpacity style={styles.primaryBtn} onPress={() => handleMarkProcessed(item)}>
+                  <Text style={styles.primaryBtnText}>Xử lý</Text>
                </TouchableOpacity>
             </View>
           </View>
@@ -97,7 +162,7 @@ export default function ExpiringMedicinesScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => router.back()} style={{padding: 4}}>
+          <TouchableOpacity onPress={() => router.push('/medicines' as any)} style={{padding: 4}}>
              <MaterialIcons name="arrow-back" size={24} color={THEME.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Cảnh báo hết hạn</Text>
@@ -118,6 +183,65 @@ export default function ExpiringMedicinesScreen() {
           </View>
         }
       />
+
+      {/* Modal Đổi trả */}
+      <Modal
+        visible={showReturnModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowReturnModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Đổi trả thuốc hết hạn</Text>
+            
+            {selectedItem && (
+              <>
+                <Text style={styles.modalMedName}>{selectedItem.name}</Text>
+                <Text style={styles.modalBatchInfo}>
+                  Lô: {selectedItem.batches?.[0]?.batchNumber} • 
+                  Số lượng tồn: {selectedItem.batches?.[0]?.quantity}
+                </Text>
+              </>
+            )}
+            
+            <Text style={styles.inputLabel}>Số lượng đổi trả *</Text>
+            <TextInput
+              style={styles.input}
+              value={returnQty}
+              onChangeText={setReturnQty}
+              keyboardType="numeric"
+              placeholder="Nhập số lượng"
+              placeholderTextColor={THEME.textGray}
+            />
+            
+            <Text style={styles.inputLabel}>Lý do đổi trả</Text>
+            <TextInput
+              style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+              value={returnReason}
+              onChangeText={setReturnReason}
+              placeholder="Nhập lý do"
+              placeholderTextColor={THEME.textGray}
+              multiline
+            />
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.cancelBtn]}
+                onPress={() => setShowReturnModal(false)}
+              >
+                <Text style={styles.cancelBtnText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.confirmBtn]}
+                onPress={confirmReturn}
+              >
+                <Text style={styles.confirmBtnText}>Xác nhận</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -152,5 +276,20 @@ const styles = StyleSheet.create({
   primaryBtnText: { fontSize: 12, fontWeight: '600', color: THEME.primary },
   
   emptyState: { alignItems: 'center', marginTop: 60, gap: 12 },
-  emptyText: { color: THEME.textGray, fontSize: 14 }
+  emptyText: { color: THEME.textGray, fontSize: 14 },
+
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { backgroundColor: THEME.white, borderRadius: 16, padding: 24, width: '100%', maxWidth: 400 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: THEME.text, marginBottom: 16, textAlign: 'center' },
+  modalMedName: { fontSize: 16, fontWeight: '600', color: THEME.primary, marginBottom: 4 },
+  modalBatchInfo: { fontSize: 13, color: THEME.textGray, marginBottom: 16 },
+  inputLabel: { fontSize: 13, fontWeight: '600', color: THEME.text, marginBottom: 6, marginTop: 12 },
+  input: { borderWidth: 1, borderColor: THEME.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: THEME.text, backgroundColor: THEME.bg },
+  modalActions: { flexDirection: 'row', gap: 12, marginTop: 24 },
+  modalBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+  cancelBtn: { backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: THEME.border },
+  cancelBtnText: { fontSize: 14, fontWeight: '600', color: THEME.textGray },
+  confirmBtn: { backgroundColor: THEME.primary },
+  confirmBtnText: { fontSize: 14, fontWeight: '600', color: THEME.white },
 });

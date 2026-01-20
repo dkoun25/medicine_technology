@@ -2,7 +2,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DrawerContentComponentProps, DrawerContentScrollView } from '@react-navigation/drawer';
 import { usePathname, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   FadeIn,
@@ -12,6 +12,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { dataManager } from '@/services/DataManager';
 
 // --- ĐỊNH NGHĨA KIỂU DỮ LIỆU ---
 type MenuItem = {
@@ -31,7 +32,7 @@ type MenuSection = {
 // --- CẤU HÌNH MENU & ĐƯỜNG DẪN ---
 // Lưu ý: Bạn cần tạo các file tương ứng trong thư mục app/(drawer)/... 
 // Ví dụ: app/(drawer)/medicines/index.tsx
-const menuData: MenuSection[] = [
+const getMenuData = (expiringCount: number, lowStockCount: number): MenuSection[] => [
   {
     title: 'Quản lý thuốc',
     defaultOpen: true,
@@ -39,8 +40,8 @@ const menuData: MenuSection[] = [
       { label: 'Danh sách thuốc', icon: '💊', route: '/medicines' },
       { label: 'Nhập thuốc', icon: '📦', route: '/medicines/import' },
       { label: 'Xuất / Bán thuốc (POS)', icon: '🛒', route: '/pos' },
-      { label: 'Thuốc sắp hết hạn', icon: '⏰', route: '/medicines/expiring', badge: '15', badgeType: 'danger' },
-      { label: 'Thuốc sắp hết hàng', icon: '📉', route: '/medicines/low-stock', badge: '8', badgeType: 'warning' },
+      { label: 'Thuốc sắp hết hạn', icon: '⏰', route: '/medicines/expiring', badge: expiringCount > 0 ? String(expiringCount) : undefined, badgeType: 'danger' },
+      { label: 'Thuốc sắp hết hàng', icon: '📉', route: '/medicines/low-stock', badge: lowStockCount > 0 ? String(lowStockCount) : undefined, badgeType: 'warning' },
     ],
   },
   {
@@ -175,6 +176,19 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   const router = useRouter();
   const pathname = usePathname();
   const colorScheme = useColorScheme() ?? 'light';
+  
+  const [expiringCount, setExpiringCount] = useState(0);
+  const [lowStockCount, setLowStockCount] = useState(0);
+
+  // Load số lượng thuốc sắp hết hạn và hết hàng
+  useEffect(() => {
+    const expiring = dataManager.getExpiringMedicines(30); // 30 ngày
+    const lowStock = dataManager.getLowStockMedicines();
+    setExpiringCount(expiring.length);
+    setLowStockCount(lowStock.length);
+  }, []);
+
+  const menuData = getMenuData(expiringCount, lowStockCount);
   
   // Fallback màu sắc nếu theme chưa load kịp
   const colors = Colors[colorScheme] || {

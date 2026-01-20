@@ -2,12 +2,30 @@
 
 # dependencies
 node_modules/
+package-lock.json
+yarn.lock
 
 # Expo
 .expo/
 dist/
 web-build/
 expo-env.d.ts
+.expo-shared/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
 
 # Native
 .kotlin/
@@ -17,6 +35,9 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+*.mobileprovision.sha1
+*.keystore
+*.pem
 
 # Metro
 .metro-health-check*
@@ -25,9 +46,44 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+debug.log
 
-# macOS
+# OS
 .DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+lerna-debug.log*
+
+# Cache
+.cache/
+.parcel-cache/
+
+# Build
+build/
+dist/
+out/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Testing
+.jest/
+.test-results/
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
 *.pem
 
 # local env files

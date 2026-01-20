@@ -1,15 +1,12 @@
-import { dataManager } from '@/services/DataManager';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-// 1. IMPORT HOOK THEME
 import { useTheme } from '@/context/ThemeContext';
 
 export default function RetailInvoicesScreen() {
   const router = useRouter();
-  // 2. LẤY MÀU TỪ CONTEXT
   const { colors, isDark } = useTheme();
   
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -17,11 +14,22 @@ export default function RetailInvoicesScreen() {
   const [filteredData, setFilteredData] = useState<any[]>([]);
 
   useEffect(() => {
-    const allInvoices = dataManager.getAllInvoices();
-    const retailInvoices = allInvoices.filter(inv => inv.type === 'retail' || !inv.type);
-    setInvoices(retailInvoices);
-    setFilteredData(retailInvoices);
+    loadInvoices();
   }, []);
+
+  const loadInvoices = () => {
+    // Lấy invoices từ localStorage
+    const stored = localStorage.getItem('invoices');
+    if (stored) {
+      const allInvoices = JSON.parse(stored);
+      const retailInvoices = allInvoices.filter((inv: any) => inv.type === 'ban-le');
+      setInvoices(retailInvoices);
+      setFilteredData(retailInvoices);
+    } else {
+      setInvoices([]);
+      setFilteredData([]);
+    }
+  };
 
   useEffect(() => {
     if (!searchQuery) {
@@ -29,7 +37,7 @@ export default function RetailInvoicesScreen() {
     } else {
       const lower = searchQuery.toLowerCase();
       const filtered = invoices.filter(item => 
-        item.code?.toLowerCase().includes(lower) || 
+        item.id?.toLowerCase().includes(lower) || 
         item.customerName?.toLowerCase().includes(lower)
       );
       setFilteredData(filtered);
@@ -65,15 +73,13 @@ export default function RetailInvoicesScreen() {
     return (
       <Animated.View entering={FadeInDown.delay(index * 50).duration(400)}>
         <TouchableOpacity 
-          // Card: Dùng màu card và border động
           style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]} 
           activeOpacity={0.7}
         >
           <View style={styles.cardHeader}>
             <View>
-              {/* Mã code: Dùng màu text động */}
-              <Text style={[styles.code, { color: colors.text }]}>#{item.code || item.id.substring(0,8).toUpperCase()}</Text>
-              <Text style={styles.date}>{new Date(item.createdAt).toLocaleString('vi-VN')}</Text>
+              <Text style={[styles.code, { color: colors.text }]}>#{item.id}</Text>
+              <Text style={styles.date}>{new Date(item.date).toLocaleString('vi-VN')}</Text>
             </View>
             <View style={[styles.badge, { backgroundColor: status.bg }]}>
               <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
@@ -84,19 +90,17 @@ export default function RetailInvoicesScreen() {
           
           <View style={styles.cardBody}>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-              {/* Avatar: Đổi nền xanh nhạt thành xám đậm nếu dark mode */}
               <View style={[styles.avatar, { backgroundColor: isDark ? '#333' : '#eff6ff' }]}>
                 <Text style={[styles.avatarText, { color: colors.primary }]}>{item.customerName?.charAt(0) || 'K'}</Text>
               </View>
               <View>
                 <Text style={styles.label}>Khách hàng</Text>
-                {/* Tên khách: Màu text động */}
-                <Text style={[styles.value, { color: colors.text }]}>{item.customerName || 'Khách lẻ'}</Text>
+                <Text style={[styles.value, { color: colors.text }]}>{item.customerName || 'Khách Vãng Lai'}</Text>
               </View>
             </View>
             <View style={{alignItems: 'flex-end'}}>
               <Text style={styles.label}>Tổng tiền</Text>
-              <Text style={[styles.total, { color: colors.primary }]}>{item.total?.toLocaleString()} ₫</Text>
+              <Text style={[styles.total, { color: colors.primary }]}>{item.totalAmount?.toLocaleString()} ₫</Text>
             </View>
           </View>
         </TouchableOpacity>

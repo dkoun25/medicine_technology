@@ -10,14 +10,8 @@ function AppNavigator() {
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
-        {/* Màn hình Dashboard (file app/index.tsx) */}
-        <Stack.Screen name="index" /> 
-        
-        {/* Màn hình Settings (file app/settings.tsx) */}
-        <Stack.Screen name="settings" />
-
-        {/* Các màn hình khác (ví dụ medicines) */}
-        {/* <Stack.Screen name="medicines" /> */}
+        {/* Modal screens */}
+        <Stack.Screen name="modal" />
       </Stack>
       
       {/* StatusBar đổi màu chữ: Trắng nếu nền tối, Đen nếu nền sáng */}

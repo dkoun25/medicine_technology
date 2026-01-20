@@ -70,8 +70,8 @@ export default function DashboardScreen() {
     });
 
     const combinedWarnings = [
-      ...expiringList.map(m => ({ ...m, type: 'expiring', label: 'Sắp hết hạn', date: m.batches[0]?.expiryDate })),
-      ...lowStockList.map(m => ({ ...m, type: 'low_stock', label: 'Sắp hết hàng', stock: m.batches.reduce((s, b) => s + b.quantity, 0) }))
+      ...expiringList.map(m => ({ ...m, type: 'expiring', label: 'Sắp hết hạn', date: m.batches?.[0]?.expiryDate })),
+      ...lowStockList.map(m => ({ ...m, type: 'low_stock', label: 'Sắp hết hàng', stock: (m.batches || []).reduce((s: number, b: any) => s + b.quantity, 0) }))
     ].slice(0, 5);
     setWarnings(combinedWarnings);
 
@@ -287,7 +287,7 @@ export default function DashboardScreen() {
                 </View>
                 
                 <Text style={[styles.tdText, {flex: 1, color: colors.text }]}>
-                  {item.batches[0]?.batchNumber || 'N/A'}
+                  {item.batches?.[0]?.batchNumber || 'N/A'}
                 </Text>
 
                 <View style={{flex: 1.5}}>
