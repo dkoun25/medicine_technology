@@ -1,63 +1,81 @@
+import { useTheme } from '@/context/ThemeContext';
+import { useInvoices } from '@/hooks/useInvoices';
+import { Invoice } from '@/types/invoice';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-// 1. IMPORT HOOK THEME
-import { useTheme } from '@/context/ThemeContext';
-
-// Dữ liệu giả lập
-const MOCK_RETURNS = [
-  { id: 'TH005', originalInvoice: 'HD00012', customer: 'Nguyễn Văn A', date: '2024-05-21', amount: 50000, reason: 'Khách đổi ý' },
-  { id: 'TH006', originalInvoice: 'HD00015', customer: 'Trần Thị B', date: '2024-05-20', amount: 120000, reason: 'Thuốc bị móp hộp' },
-];
 
 export default function ReturnsScreen() {
   const router = useRouter();
-  // 2. LẤY MÀU TỪ CONTEXT
   const { colors, isDark } = useTheme();
+  const { invoices } = useInvoices();
   
-  const [returns, setReturns] = useState(MOCK_RETURNS);
+  const [returns, setReturns] = useState<Invoice[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const renderItem = ({ item, index }: { item: any, index: number }) => (
-    <Animated.View entering={FadeInDown.delay(index * 50).duration(400)}>
-      <TouchableOpacity 
-        // Card đổi màu theo theme
-        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]} 
-        activeOpacity={0.7}
-      >
-        <View style={styles.cardHeader}>
-          <View>
-            {/* Mã phiếu: màu text động */}
-            <Text style={[styles.code, { color: colors.text }]}>{item.id}</Text>
-            <Text style={styles.ref}>Từ hóa đơn: {item.originalInvoice}</Text>
-          </View>
-          
-          {/* Badge Hoàn tiền:
-              - Chữ: Luôn đỏ (#ef4444)
-              - Nền: Sáng thì đỏ nhạt (#fef2f2), Tối thì đỏ thẫm (#450a0a) 
-          */}
-          <View style={[styles.refundBadge, { backgroundColor: isDark ? '#450a0a' : '#fef2f2' }]}>
-            <Text style={styles.refundText}>- {item.amount.toLocaleString()} ₫</Text>
-          </View>
-        </View>
+  // Lọc hóa đơn trả hàng
+  useEffect(() => {
+    const returnInvoices = invoices.filter(inv => inv.type === 'return');
+    setReturns(returnInvoices);
+  }, [invoices]);
 
-        {/* Divider đổi màu theo theme */}
-        <View style={[styles.divider, { backgroundColor: isDark ? '#333' : '#f0f2f5' }]} />
-
-        <View style={styles.cardBody}>
-          <View>
-             <Text style={styles.label}>Khách hàng</Text>
-             <Text style={[styles.value, { color: colors.text }]}>{item.customer}</Text>
-          </View>
-          <View style={{alignItems: 'flex-end', flex: 1}}>
-             <Text style={styles.label}>Lý do</Text>
-             <Text style={[styles.reason, { color: colors.text }]} numberOfLines={1}>{item.reason}</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
+  // Lọc theo tìm kiếm
+  const filteredReturns = returns.filter(item =>
+    !searchQuery ||
+    item.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.customerName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const renderItem = ({ item, index }: { item: Invoice, index: number }) => {
+    // Lấy lý do từ notes
+    const reason = item.notes || 'Không ghi chú';
+    
+    return (
+      <Animated.View entering={FadeInDown.delay(index * 50).duration(400)}>
+        <TouchableOpacity 
+          style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]} 
+          activeOpacity={0.7}
+          onPress={() => {
+            Alert.alert(
+              `Phiếu trầ ${item.code}`,
+              `Khách hàng: ${item.customerName}\n` +
+              `Ngày tạo: ${new Date(item.createdAt).toLocaleString('vi-VN')}\n` +
+              `Số lượng SP: ${item.items.length}\n` +
+              `Số tiền hoàn: ${item.total.toLocaleString()} ₫\n` +
+              `Lý do: ${reason}`,
+              [{ text: 'Đóng' }]
+            );
+          }}
+        >
+          <View style={styles.cardHeader}>
+            <View>
+              <Text style={[styles.code, { color: colors.text }]}>{item.code}</Text>
+              <Text style={styles.ref}>{new Date(item.createdAt).toLocaleDateString('vi-VN')}</Text>
+            </View>
+            
+            <View style={[styles.refundBadge, { backgroundColor: isDark ? '#450a0a' : '#fef2f2' }]}>
+              <Text style={styles.refundText}>- {item.total.toLocaleString()} ₫</Text>
+            </View>
+          </View>
+
+          <View style={[styles.divider, { backgroundColor: isDark ? '#333' : '#f0f2f5' }]} />
+
+          <View style={styles.cardBody}>
+            <View>
+              <Text style={styles.label}>Khách hàng</Text>
+              <Text style={[styles.value, { color: colors.text }]}>{item.customerName}</Text>
+            </View>
+            <View style={{alignItems: 'flex-end', flex: 1}}>
+              <Text style={styles.label}>Lý do</Text>
+              <Text style={[styles.reason, { color: colors.text }]} numberOfLines={1}>{reason}</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
 
   return (
     // Container đổi màu nền
@@ -85,15 +103,23 @@ export default function ReturnsScreen() {
             style={[styles.input, { color: colors.text }]} 
             placeholder="Tìm phiếu trả, tên khách..." 
             placeholderTextColor="#9ca3af"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
         </View>
       </View>
 
       <FlatList
-        data={returns}
+        data={filteredReturns}
         renderItem={renderItem}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.list}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <MaterialIcons name="assignment-return" size={48} color={colors.border} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Chưa có phiếu trả hàng nào</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -121,4 +147,6 @@ const styles = StyleSheet.create({
   label: { fontSize: 10, color: '#617589' },
   value: { fontSize: 14, fontWeight: '500' },
   reason: { fontSize: 14, fontStyle: 'italic' },
+  empty: { alignItems: 'center', marginTop: 50, gap: 8 },
+  emptyText: { fontSize: 14 },
 });
