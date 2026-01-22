@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, useColorScheme, Modal, FlatList } from 'react-native';
-import ThemedText from '@/components/themed-text';
-import ThemedView from '@/components/themed-view';
-import { Input } from '@/components/ui/Input';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
 import { Colors } from '@/constants/Colors';
 import { useMedicinesData } from '@/hooks/useMedicines';
 import { formatCurrency } from '@/utils/formatters';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Dimensions, FlatList, Modal, ScrollView, StyleSheet, TouchableOpacity, useColorScheme, View } from 'react-native';
 
 interface CartItem {
   id: string;
@@ -41,10 +42,15 @@ export default function POSScreen() {
   const isDark = colorScheme === 'dark';
   const colors = Colors[isDark ? 'dark' : 'light'];
 
-  // Filter medicines based on search
-  const filteredMedicines = medicines.filter(med =>
-    med.name.toLowerCase().includes(searchQuery.toLowerCase()) && med.quantity > 0
-  );
+  const router = useRouter();
+  const { width } = Dimensions.get('window');
+  const isTablet = width > 768;
+
+  // Filter medicines based on search - calculate total stock from batches
+  const filteredMedicines = medicines.filter(med => {
+    const totalStock = med.batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
+    return med.name.toLowerCase().includes(searchQuery.toLowerCase()) && totalStock > 0;
+  });
 
   // Add to cart
   const addToCart = (medicine: any) => {
@@ -66,9 +72,9 @@ export default function POSScreen() {
         {
           id: medicine.id,
           name: medicine.name,
-          unitPrice: medicine.sellingPrice || medicine.unitPrice,
+          unitPrice: medicine.batches?.[0]?.sellingPrice || 0,
           quantity: 1,
-          total: medicine.sellingPrice || medicine.unitPrice,
+          total: medicine.batches?.[0]?.sellingPrice || 0,
         },
       ];
     });
@@ -157,6 +163,12 @@ export default function POSScreen() {
           <ScrollView contentContainerStyle={styles.productContent}>
             <View style={styles.header}>
               <ThemedText style={styles.title}>🛒 Bán Hàng POS</ThemedText>
+              <TouchableOpacity
+                onPress={() => router.push('/medicines' as any)}
+                style={styles.navButton}
+              >
+                <ThemedText style={styles.navButtonText}>📦 Kho thuốc</ThemedText>
+              </TouchableOpacity>
             </View>
 
             {/* Search */}
@@ -176,27 +188,30 @@ export default function POSScreen() {
 
             {/* Products Grid */}
             <View style={styles.productsGrid}>
-              {filteredMedicines.map(medicine => (
+              {filteredMedicines.map(medicine => {
+                const totalStock = medicine.batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
+                const price = medicine.batches?.[0]?.sellingPrice || 0;
+                return (
                 <TouchableOpacity
                   key={medicine.id}
                   onPress={() => addToCart(medicine)}
-                  style={[styles.productCard, { borderColor: colors.border }]}
+                  style={[styles.productCard, { borderColor: colors.border, width: isTablet ? '31%' : '48%' }]}
                   activeOpacity={0.7}
                 >
                   <ThemedText style={styles.productName} numberOfLines={2}>
                     {medicine.name}
                   </ThemedText>
                   <ThemedText style={styles.productPrice}>
-                    {formatCurrency(medicine.sellingPrice || medicine.unitPrice)}
+                    {formatCurrency(price)}
                   </ThemedText>
                   <ThemedText style={styles.productStock}>
-                    Còn: {medicine.quantity}
+                    Còn: {totalStock}
                   </ThemedText>
                   <View style={styles.addToCartBtn}>
                     <ThemedText style={{ fontWeight: '600', color: '#fff' }}>Chọn</ThemedText>
                   </View>
                 </TouchableOpacity>
-              ))}
+              );})}
             </View>
           </ScrollView>
         </View>
@@ -319,7 +334,10 @@ export default function POSScreen() {
           <FlatList
             data={filteredMedicines}
             keyExtractor={item => item.id}
-            renderItem={({ item }) => (
+            renderItem={({ item }) => {
+              const totalStock = item.batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
+              const price = item.batches?.[0]?.sellingPrice || 0;
+              return (
               <TouchableOpacity
                 onPress={() => {
                   addToCart(item);
@@ -330,12 +348,13 @@ export default function POSScreen() {
                 <View>
                   <ThemedText style={styles.modalItemName}>{item.name}</ThemedText>
                   <ThemedText style={styles.modalItemPrice}>
-                    {formatCurrency(item.sellingPrice || item.unitPrice)}
+                    {formatCurrency(price)}
                   </ThemedText>
                 </View>
-                <ThemedText style={styles.modalItemStock}>Còn: {item.quantity}</ThemedText>
+                <ThemedText style={styles.modalItemStock}>Còn: {totalStock}</ThemedText>
               </TouchableOpacity>
-            )}
+            );}
+            }
           />
         </ThemedView>
       </Modal>
@@ -445,7 +464,7 @@ export default function POSScreen() {
             <Button
               title="Quay Lại"
               onPress={() => setShowPaymentModal(false)}
-              style={[styles.payBtn, { backgroundColor: '#6b7280' }]}
+              style={styles.cancelBtn}
             />
           </ScrollView>
         </ThemedView>
@@ -454,28 +473,47 @@ export default function POSScreen() {
   );
 }
 
+const { width } = Dimensions.get('window');
+const isTablet = width > 768;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   mainContent: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: isTablet ? 'row' : 'column',
   },
   productPanel: {
-    flex: 2,
-    borderRightWidth: 1,
+    flex: isTablet ? 2 : 1,
+    borderRightWidth: isTablet ? 1 : 0,
     borderRightColor: '#e5e7eb',
+    borderBottomWidth: isTablet ? 0 : 1,
+    borderBottomColor: '#e5e7eb',
   },
   productContent: {
     padding: 16,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  navButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  navButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
   searchContainer: {
     marginBottom: 16,
@@ -493,7 +531,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   productCard: {
-    width: '31%',
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
@@ -522,7 +559,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cartPanel: {
-    flex: 1,
+    flex: isTablet ? 1 : 0,
+    minHeight: isTablet ? 0 : 400,
     padding: 16,
   },
   cartHeader: {
@@ -605,7 +643,7 @@ const styles = StyleSheet.create({
   totalRow: {
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
-    paddingTopMarginTop: 8,
+    marginTop: 8,
     paddingTop: 8,
   },
   totalLabel: {
@@ -698,5 +736,9 @@ const styles = StyleSheet.create({
   payBtn: {
     marginBottom: 12,
     backgroundColor: '#10b981',
+  },
+  cancelBtn: {
+    marginBottom: 12,
+    backgroundColor: '#6b7280',
   },
 });

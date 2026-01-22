@@ -7,14 +7,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    Dimensions,
-    FlatList,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Dimensions,
+  FlatList,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -35,6 +36,8 @@ export default function POSScreen() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successInvoiceCode, setSuccessInvoiceCode] = useState('');
   const [successTotal, setSuccessTotal] = useState(0);
+  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank_transfer'>('cash');
 
   const SEMANTIC = {
     green: '#22c55e',
@@ -132,7 +135,7 @@ export default function POSScreen() {
         total: totalAmount,
         paid: totalAmount,
         change: 0,
-        paymentMethod: 'cash',
+        paymentMethod,
         status: 'completed',
         cashierId: 'CASHIER-001',
         cashierName: 'Thu ngân',
@@ -184,7 +187,16 @@ export default function POSScreen() {
       activeOpacity={0.7}
     >
       <View style={styles.productIcon}>
-        <Text style={styles.productInitials}>{item.name.charAt(0)}</Text>
+        {item.image && !failedImages[item.id] ? (
+          <Image
+            source={{ uri: item.image.startsWith('http') || item.image.startsWith('file://') ? item.image : `file://${item.image}` }}
+            style={styles.productImage}
+            resizeMode="cover"
+            onError={() => setFailedImages(prev => ({ ...prev, [item.id]: true }))}
+          />
+        ) : (
+          <Text style={styles.productInitials}>{item.name.charAt(0)}</Text>
+        )}
       </View>
       <View style={{flex: 1}}>
         <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
@@ -200,6 +212,8 @@ export default function POSScreen() {
     p.id.includes(searchQuery)
   );
 
+  const paymentLabel = paymentMethod === 'cash' ? 'Tiền mặt' : 'Chuyển khoản';
+
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     
@@ -208,7 +222,7 @@ export default function POSScreen() {
       paddingTop: 50, paddingHorizontal: 16, paddingBottom: 16, 
       backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border 
     },
-    headerTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 12 },
+    headerTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text },
     searchBox: { 
       flexDirection: 'row', alignItems: 'center', backgroundColor: isDark ? '#374151' : '#f0f2f5', 
       borderRadius: 8, paddingHorizontal: 12, height: 44 
@@ -216,19 +230,43 @@ export default function POSScreen() {
     searchInput: { flex: 1, marginLeft: 8, fontSize: 14, color: colors.text },
 
     // Body Layout
-    body: { flex: 1, flexDirection: 'row' },
-    leftColumn: { flex: 2, borderRightWidth: 1, borderRightColor: colors.border },
-    rightColumn: { flex: 1, backgroundColor: colors.card },
+    body: { flex: 1, flexDirection: IS_TABLET ? 'row' : 'column' },
+    leftColumn: { 
+      flex: IS_TABLET ? 2 : undefined,
+      height: IS_TABLET ? undefined : '40%',
+      borderRightWidth: IS_TABLET ? 1 : 0,
+      borderRightColor: colors.border,
+      borderBottomWidth: IS_TABLET ? 0 : 1,
+      borderBottomColor: colors.border
+    },
+    rightColumn: { 
+      flex: 1,
+      minHeight: IS_TABLET ? undefined : 300,
+      backgroundColor: colors.card 
+    },
 
     // Product List
     productList: { padding: 12, gap: 8 },
     productCard: { 
-      flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, 
-      borderRadius: 8, padding: 12, gap: 12, borderWidth: 1, borderColor: colors.border 
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      backgroundColor: colors.card, 
+      borderRadius: 8, 
+      padding: 12, 
+      gap: 12, 
+      borderWidth: 1, 
+      borderColor: colors.border,
+      width: IS_TABLET ? undefined : '48%',
+      marginHorizontal: IS_TABLET ? 0 : '1%'
     },
     productIcon: { 
       width: 40, height: 40, borderRadius: 20, backgroundColor: SEMANTIC.blueBg, 
       alignItems: 'center', justifyContent: 'center' 
+    },
+    productImage: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 20
     },
     productInitials: { fontSize: 16, fontWeight: 'bold', color: colors.primary },
     productName: { fontSize: 14, fontWeight: '600', color: colors.text },
@@ -248,6 +286,13 @@ export default function POSScreen() {
     },
     cartItemName: { fontSize: 14, fontWeight: '500', color: colors.text },
     cartItemPrice: { fontSize: 12, color: SEMANTIC.textGray, marginTop: 2 },
+    cartInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+    cartUnitBadge: { 
+      backgroundColor: isDark ? '#333333' : '#e5e7eb', 
+      paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 
+    },
+    cartUnitText: { fontSize: 11, color: SEMANTIC.textGray },
+    cartActive: { fontSize: 12, color: SEMANTIC.textGray, flexShrink: 1 },
     qtyControl: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     qtyBtn: { 
       width: 24, height: 24, borderRadius: 4, backgroundColor: isDark ? '#4b5563' : '#e5e7eb', 
@@ -271,22 +316,44 @@ export default function POSScreen() {
     divider: { height: 1, backgroundColor: colors.border, marginVertical: 8 },
     totalLabel: { fontSize: 16, fontWeight: 'bold', color: colors.text },
     totalValue: { fontSize: 18, fontWeight: 'bold', color: SEMANTIC.green },
-    payButton: { 
-      backgroundColor: colors.primary, borderRadius: 8, height: 48, 
-      alignItems: 'center', justifyContent: 'center' 
+    payMethodsRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 12,
+      marginBottom: 12
     },
-    payButtonDisabled: {
-      backgroundColor: isDark ? '#4b5563' : '#d1d5db',
-      opacity: 0.6,
+    payMethodBtn: {
+      flex: 1,
+      height: 44,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? '#1f2937' : colors.card
     },
-    payButtonText: { color: colors.card, fontSize: 16, fontWeight: 'bold' },
+    payMethodBtnActive: {
+      borderColor: colors.primary,
+      backgroundColor: isDark ? '#0b1629' : '#e7f1ff'
+    },
+    payMethodText: { fontSize: 14, fontWeight: '600', color: colors.text },
+    payMethodTextActive: { color: colors.primary },
   });
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Bán hàng (POS)</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <Text style={styles.headerTitle}>Bán hàng (POS)</Text>
+          <TouchableOpacity 
+            onPress={() => router.push('/medicines')}
+            style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
+          >
+            <MaterialIcons name="medication" size={16} color={colors.card} />
+            <Text style={{ color: colors.card, marginLeft: 4, fontSize: 13, fontWeight: '600' }}>Danh sách thuốc</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.searchBox}>
           <MaterialIcons name="search" size={20} color={SEMANTIC.textGray} />
           <TextInput
@@ -307,7 +374,8 @@ export default function POSScreen() {
             renderItem={renderProduct}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.productList}
-            numColumns={1} 
+            numColumns={IS_TABLET ? 1 : 2}
+            key={IS_TABLET ? 'tablet' : 'mobile'}
             showsVerticalScrollIndicator={false}
           />
         </View>
@@ -336,6 +404,14 @@ export default function POSScreen() {
                 >
                   <View style={{flex: 1}}>
                     <Text style={styles.cartItemName}>{item.name}</Text>
+                    <View style={styles.cartInfoRow}>
+                      <Text style={styles.cartActive} numberOfLines={1}>{item.activeIngredient || 'Chưa có hoạt chất'}</Text>
+                      {item.unit && (
+                        <View style={styles.cartUnitBadge}>
+                          <Text style={styles.cartUnitText}>{item.unit}</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.cartItemPrice}>{item.price?.toLocaleString()} ₫</Text>
                   </View>
                   
@@ -379,16 +455,32 @@ export default function POSScreen() {
               <Text style={styles.totalLabel}>TỔNG TIỀN:</Text>
               <Text style={styles.totalValue}>{totalAmount.toLocaleString()} ₫</Text>
             </View>
-            
-            <TouchableOpacity 
-              style={[styles.payButton, (cart.length === 0 || isProcessing) && styles.payButtonDisabled]} 
-              onPress={handleCheckout}
-              disabled={cart.length === 0 || isProcessing}
-            >
-              <Text style={styles.payButtonText}>
-                {isProcessing ? 'ĐANG XỬ LÝ...' : 'THANH TOÁN'}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.payMethodsRow}>
+              <TouchableOpacity
+                style={[styles.payMethodBtn, paymentMethod === 'cash' && styles.payMethodBtnActive, (cart.length === 0 || isProcessing) && { opacity: 0.6 }]}
+                disabled={cart.length === 0 || isProcessing}
+                onPress={() => {
+                  setPaymentMethod('cash');
+                  handleCheckout();
+                }}
+              >
+                <Text style={[styles.payMethodText, paymentMethod === 'cash' && styles.payMethodTextActive]}>
+                  {isProcessing && paymentMethod === 'cash' ? 'ĐANG XỬ LÝ...' : 'Tiền mặt'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.payMethodBtn, paymentMethod === 'bank_transfer' && styles.payMethodBtnActive, (cart.length === 0 || isProcessing) && { opacity: 0.6 }]}
+                disabled={cart.length === 0 || isProcessing}
+                onPress={() => {
+                  setPaymentMethod('bank_transfer');
+                  handleCheckout();
+                }}
+              >
+                <Text style={[styles.payMethodText, paymentMethod === 'bank_transfer' && styles.payMethodTextActive]}>
+                  {isProcessing && paymentMethod === 'bank_transfer' ? 'ĐANG XỬ LÝ...' : 'Chuyển khoản'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -397,7 +489,7 @@ export default function POSScreen() {
       <ConfirmModal
         visible={showConfirmModal}
         title="Xác nhận thanh toán"
-        message={`Khách hàng: ${customerName.trim() || 'Khách Vãng Lai'}\nTổng tiền: ${totalAmount.toLocaleString()} ₫\n\nBạn có chắc chắn muốn xuất hóa đơn?`}
+        message={`Khách hàng: ${customerName.trim() || 'Khách Vãng Lai'}\nTổng tiền: ${totalAmount.toLocaleString()} ₫\nHình thức: ${paymentLabel}\n\nBạn có chắc chắn muốn xuất hóa đơn?`}
         onConfirm={processCheckout}
         onCancel={() => setShowConfirmModal(false)}
         confirmText="Thanh toán"
@@ -408,7 +500,7 @@ export default function POSScreen() {
       <SuccessModal
         visible={showSuccessModal}
         title="Thanh toán thành công"
-        message={`Hóa đơn: ${successInvoiceCode}\nKhách hàng: ${customerName.trim() || 'Khách Vãng Lai'}\nTổng tiền: ${successTotal.toLocaleString()} ₫`}
+        message={`Hóa đơn: ${successInvoiceCode}\nKhách hàng: ${customerName.trim() || 'Khách Vãng Lai'}\nTổng tiền: ${successTotal.toLocaleString()} ₫\nHình thức: ${paymentLabel}`}
         onPrimaryAction={() => {
           setShowSuccessModal(false);
           router.push('/(drawer)/hoa-don/ban-le' as any);

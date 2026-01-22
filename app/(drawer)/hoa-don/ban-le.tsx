@@ -2,9 +2,9 @@ import { useTheme } from '@/context/ThemeContext';
 import { useInvoices } from '@/hooks/useInvoices';
 import { Invoice } from '@/types/invoice';
 import { MaterialIcons } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native';
+import { DrawerActions, useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -12,7 +12,7 @@ export default function RetailInvoicesScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const { colors, isDark } = useTheme();
-  const { invoices: allInvoices, loading, loadInvoices: reloadInvoices } = useInvoices();
+  const { invoices: allInvoices, loading, loadInvoices: reloadInvoices, deleteInvoice, updateInvoice } = useInvoices();
   
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
@@ -20,6 +20,15 @@ export default function RetailInvoicesScreen() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredData, setFilteredData] = useState<Invoice[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editCustomerName, setEditCustomerName] = useState('');
+
+  // Luôn reload khi màn hình focus để thấy hóa đơn mới tạo từ POS
+  useFocusEffect(
+    useCallback(() => {
+      reloadInvoices();
+    }, [reloadInvoices])
+  );
 
   // Lọc hóa đơn bán lẻ
   useEffect(() => {
@@ -70,6 +79,32 @@ export default function RetailInvoicesScreen() {
 
   const renderItem = ({ item, index }: { item: Invoice, index: number }) => {
     const status = getStatusStyle(item.status);
+    const handleDelete = () => {
+      Alert.alert(
+        'Xóa hóa đơn',
+        `Bạn chắc chắn xóa hóa đơn ${item.code}?`,
+        [
+          { text: 'Hủy', style: 'cancel' },
+          { text: 'Xóa', style: 'destructive', onPress: async () => {
+            await deleteInvoice(item.id);
+            reloadInvoices();
+          }}
+        ]
+      );
+    };
+
+    const handleEditStart = () => {
+      setEditingId(item.id);
+      setEditCustomerName(item.customerName || '');
+    };
+
+    const handleEditSave = async () => {
+      await updateInvoice(item.id, { customerName: editCustomerName.trim() || 'Khách Vãng Lai' });
+      setEditingId(null);
+      setEditCustomerName('');
+      reloadInvoices();
+    };
+
     return (
       <Animated.View entering={FadeInDown.delay(index * 50).duration(400)}>
         <TouchableOpacity 
@@ -94,13 +129,23 @@ export default function RetailInvoicesScreen() {
               <Text style={[styles.code, { color: colors.text }]}>{item.code}</Text>
               <Text style={styles.date}>{new Date(item.createdAt).toLocaleString('vi-VN')}</Text>
             </View>
-            <View style={[styles.badge, { backgroundColor: status.bg }]}>
-              <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
+            <View style={styles.badgeRow}>
+              <View style={[styles.badge, { backgroundColor: status.bg }]}>
+                <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
+              </View>
+              <View style={styles.cardActions}>
+                <TouchableOpacity style={styles.actionBtn} onPress={handleEditStart}>
+                  <MaterialIcons name="edit" size={20} color={colors.text} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn} onPress={handleDelete}>
+                  <MaterialIcons name="delete" size={20} color="#ef4444" />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-          
+
           <View style={[styles.divider, { backgroundColor: isDark ? '#333' : '#f0f2f5' }]} />
-          
+
           <View style={styles.cardBody}>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
               <View style={[styles.avatar, { backgroundColor: isDark ? '#333' : '#eff6ff' }]}>
@@ -116,6 +161,27 @@ export default function RetailInvoicesScreen() {
               <Text style={[styles.total, { color: colors.primary }]}>{item.total.toLocaleString()} ₫</Text>
             </View>
           </View>
+
+          {editingId === item.id && (
+            <View style={styles.editBlock}>
+              <Text style={[styles.label, { marginBottom: 4 }]}>Sửa tên khách hàng</Text>
+              <TextInput
+                style={[styles.editInput, { borderColor: colors.border, color: colors.text }]}
+                placeholder="Tên khách hàng"
+                placeholderTextColor="#9ca3af"
+                value={editCustomerName}
+                onChangeText={setEditCustomerName}
+              />
+              <View style={styles.editActions}>
+                <TouchableOpacity style={[styles.editBtn, { borderColor: colors.border }]} onPress={() => { setEditingId(null); setEditCustomerName(''); }}>
+                  <Text style={[styles.editBtnText, { color: colors.text }]}>Hủy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.editBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={handleEditSave}>
+                  <Text style={[styles.editBtnText, { color: '#fff' }]}>Lưu</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </TouchableOpacity>
       </Animated.View>
     );
@@ -185,10 +251,13 @@ const styles = StyleSheet.create({
   list: { padding: 16, gap: 12 },
   card: { borderRadius: 12, padding: 16, borderWidth: 1, shadowColor: "#000", shadowOffset: {width:0, height:1}, shadowOpacity: 0.05, elevation: 1 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   code: { fontSize: 16, fontWeight: 'bold' },
   date: { fontSize: 12, color: '#617589', marginTop: 2 },
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   badgeText: { fontSize: 12, fontWeight: '600' },
+  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
+  actionBtn: { padding: 6, borderRadius: 6, backgroundColor: 'transparent' },
   divider: { height: 1, marginVertical: 12 },
   cardBody: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   avatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
@@ -198,4 +267,9 @@ const styles = StyleSheet.create({
   total: { fontSize: 16, fontWeight: 'bold' },
   empty: { alignItems: 'center', marginTop: 50, gap: 8 },
   emptyText: { color: '#617589' }
+  ,editBlock: { marginTop: 12, gap: 8 },
+  editInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, height: 40, fontSize: 14 },
+  editActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
+  editBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
+  editBtnText: { fontWeight: '600', fontSize: 14 }
 });

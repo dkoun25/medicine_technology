@@ -1,10 +1,10 @@
 import { useTheme } from '@/context/ThemeContext';
 import { dataManager } from '@/services/DataManager';
 import { MaterialIcons } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native';
+import { DrawerActions, useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, Image, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 export default function MedicinesScreen() {
@@ -14,6 +14,7 @@ export default function MedicinesScreen() {
   const [medicines, setMedicines] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredMedicines, setFilteredMedicines] = useState<any[]>([]);
+  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
 
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
@@ -31,12 +32,14 @@ export default function MedicinesScreen() {
     textGray: isDark ? '#9ca3af' : '#617589',
   };
 
-  // 1. Load dữ liệu ban đầu
-  useEffect(() => {
-    const data = dataManager.getAllMedicines();
-    setMedicines(data);
-    setFilteredMedicines(data);
-  }, []);
+  // 1. Load dữ liệu mỗi khi màn hình được focus (reload khi quay lại)
+  useFocusEffect(
+    useCallback(() => {
+      const data = dataManager.getAllMedicines();
+      setMedicines(data);
+      setFilteredMedicines(data);
+    }, [])
+  );
 
   // 2. Xử lý logic tìm kiếm
   useEffect(() => {
@@ -78,7 +81,16 @@ export default function MedicinesScreen() {
         >
           {/* Cột trái: Icon */}
           <View style={styles.iconContainer}>
-            <MaterialIcons name="medication" size={28} color={colors.primary} />
+            {item.image && !failedImages[item.id] ? (
+              <Image 
+                source={{ uri: item.image.startsWith('http') || item.image.startsWith('file://') ? item.image : `file://${item.image}` }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+                onError={() => setFailedImages(prev => ({ ...prev, [item.id]: true }))}
+              />
+            ) : (
+              <MaterialIcons name="medication" size={28} color={colors.primary} />
+            )}
           </View>
 
           {/* Cột phải: Thông tin */}

@@ -261,13 +261,19 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
     <View style={{ flex: 1, backgroundColor: colors.backgroundCard }}>
       {/* Header Logo */}
       <Animated.View entering={FadeIn.duration(500)} style={styles.header}>
-        <View style={[styles.logoContainer, { backgroundColor: `${colors.primary}15` }]}>
-          <Text style={styles.logoIcon}>💊</Text>
-        </View>
-        <View style={styles.headerText}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Pharmacy Pro</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Quản lý nhà thuốc</Text>
-        </View>
+        <TouchableOpacity 
+          style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+          onPress={() => handleNavigation('/')}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.logoContainer, { backgroundColor: `${colors.primary}15` }]}>
+            <Text style={styles.logoIcon}>💊</Text>
+          </View>
+          <View style={styles.headerText}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Pharmacy Pro</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Quản lý nhà thuốc</Text>
+          </View>
+        </TouchableOpacity>
       </Animated.View>
 
       {/* Danh sách Menu */}

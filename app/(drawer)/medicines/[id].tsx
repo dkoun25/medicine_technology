@@ -2,6 +2,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { dataManager } from '@/services/DataManager';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -14,6 +15,7 @@ export default function MedicineDetailScreen() {
   const [medicine, setMedicine] = useState<any>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [importQty, setImportQty] = useState('');
   const [importPrice, setImportPrice] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
@@ -96,8 +98,30 @@ export default function MedicineDetailScreen() {
     });
 
     if (!result.canceled) {
-      setTempImage(result.assets[0].uri);
-      setEditImage(result.assets[0].uri);
+      try {
+        // Create persistent directory for medicine images
+        const imageDir = `${FileSystem.documentDirectory}medicine_images/`;
+        
+        try {
+          await FileSystem.getInfoAsync(imageDir);
+        } catch {
+          await FileSystem.makeDirectoryAsync(imageDir, { intermediates: true });
+        }
+
+        // Save image to persistent location
+        const fileName = `${medicine.id}_${Date.now()}.jpg`;
+        const persistentUri = `${imageDir}${fileName}`;
+        
+        await FileSystem.copyAsync({
+          from: result.assets[0].uri,
+          to: persistentUri,
+        });
+
+        setTempImage(persistentUri);
+        setEditImage(persistentUri);
+      } catch (error) {
+        Alert.alert('Lỗi', 'Không thể lưu ảnh: ' + (error as any).message);
+      }
     }
   };
 
@@ -120,6 +144,20 @@ export default function MedicineDetailScreen() {
     Alert.alert('✅ Cập nhật thành công', 'Thông tin thuốc đã được cập nhật', [
       { text: 'OK', onPress: () => { loadData(); setShowEditModal(false); } }
     ]);
+  };
+
+  const handleDeleteMedicine = () => {
+    if (!medicine) return;
+    const success = dataManager.deleteMedicine(medicine.id);
+    if (success) {
+      setShowDeleteModal(false);
+      router.replace('/medicines' as any);
+      setTimeout(() => {
+        Alert.alert('✅ Đã xóa', 'Thuốc đã được xóa khỏi hệ thống');
+      }, 300);
+    } else {
+      Alert.alert('Lỗi', 'Không thể xóa thuốc');
+    }
   };
 
   if (!medicine) return <View style={{flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: colors.text}}>Đang tải...</Text></View>;
@@ -191,62 +229,69 @@ export default function MedicineDetailScreen() {
            <MaterialIcons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chi tiết thuốc</Text>
-        <TouchableOpacity onPress={() => setShowEditModal(true)} style={styles.backBtn}>
-           <MaterialIcons name="edit-note" size={24} color={colors.primary} />
-        </TouchableOpacity>
+        <View style={{flexDirection: 'row', gap: 8}}>
+          <TouchableOpacity onPress={() => setShowDeleteModal(true)} style={styles.backBtn}>
+             <MaterialIcons name="delete-outline" size={24} color="#ef4444" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowEditModal(true)} style={styles.backBtn}>
+             <MaterialIcons name="edit-note" size={24} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         
-        {/* Section 1: Thông tin cơ bản */}
-        <View style={styles.sectionCard}>
-          <View style={styles.mainInfo}>
-            <View style={styles.iconBox}>
-               {medicine.image && !failedImages[medicine.id] ? (
-                 <Image 
-                   source={{ uri: medicine.image }} 
-                   style={styles.medImage} 
-                   resizeMode="cover"
-                   onError={() => setFailedImages(prev => ({ ...prev, [medicine.id]: true }))}
-                 />
-               ) : (
-                 <MaterialIcons name="medication" size={40} color={colors.primary} />
-               )}
-            </View>
-            <View style={{flex: 1}}>
-               <Text style={styles.medName}>{medicine.name}</Text>
-               <Text style={styles.medSku}>SKU: {medicine.id}</Text>
-               <View style={styles.priceTag}>
-                 <Text style={styles.priceText}>{medicine.batches?.[0]?.sellingPrice?.toLocaleString() || '0'} ₫</Text>
-                 <Text style={styles.unitText}>/ {medicine.unit}</Text>
-               </View>
-            </View>
-          </View>
+        {medicine ? (
+          <>
+            {/* Section 1: Thông tin cơ bản */}
+            <View style={styles.sectionCard}>
+              <View style={styles.mainInfo}>
+                <View style={styles.iconBox}>
+                   {medicine.image && !failedImages[medicine.id] ? (
+                     <Image 
+                       source={{ uri: medicine.image.startsWith('http') || medicine.image.startsWith('file://') ? medicine.image : `file://${medicine.image}` }} 
+                       style={styles.medImage} 
+                       resizeMode="cover"
+                       onError={() => setFailedImages(prev => ({ ...prev, [medicine.id]: true }))}
+                     />
+                   ) : (
+                     <MaterialIcons name="medication" size={40} color={colors.primary} />
+                   )}
+                </View>
+                <View style={{flex: 1}}>
+                   <Text style={styles.medName}>{medicine.name}</Text>
+                   <Text style={styles.medSku}>SKU: {medicine.id}</Text>
+                   <View style={styles.priceTag}>
+                     <Text style={styles.priceText}>{medicine.batches?.[0]?.sellingPrice?.toLocaleString() || '0'} ₫</Text>
+                     <Text style={styles.unitText}>/ {medicine.unit}</Text>
+                   </View>
+                </View>
+              </View>
 
-          <View style={styles.gridInfo}>
-            <View style={styles.infoItem}>
-              <Text style={styles.label}>Hoạt chất</Text>
-              <Text style={styles.value}>{medicine.activeIngredient || 'Chưa cập nhật'}</Text>
+              <View style={styles.gridInfo}>
+                <View style={styles.infoItem}>
+                  <Text style={styles.label}>Hoạt chất</Text>
+                  <Text style={styles.value}>{medicine.activeIngredient || 'Chưa cập nhật'}</Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <Text style={styles.label}>Nhà sản xuất</Text>
+                  <Text style={styles.value}>{medicine.manufacturer || 'Chưa cập nhật'}</Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <Text style={styles.label}>Tồn kho tổng</Text>
+                  <Text style={[styles.value, {color: colors.primary, fontWeight: 'bold'}]}>{totalStock}</Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <Text style={styles.label}>Danh mục</Text>
+                  <Text style={styles.value}>{medicine.category || 'Chưa phân loại'}</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.label}>Nhà sản xuất</Text>
-              <Text style={styles.value}>{medicine.manufacturer || 'Chưa cập nhật'}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.label}>Tồn kho tổng</Text>
-              <Text style={[styles.value, {color: colors.primary, fontWeight: 'bold'}]}>{totalStock}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.label}>Danh mục</Text>
-              <Text style={styles.value}>{medicine.category || 'Chưa phân loại'}</Text>
-            </View>
-          </View>
-        </View>
 
-        {/* Section 2: Danh sách lô hàng (Batches) */}
-        <Text style={styles.sectionTitle}>Lô hàng trong kho</Text>
-        
-        {medicine.batches && medicine.batches.map((batch: any, index: number) => (
+            {/* Section 2: Danh sách lô hàng (Batches) */}
+            <Text style={styles.sectionTitle}>Lô hàng trong kho</Text>
+            
+            {medicine.batches && medicine.batches.map((batch: any, index: number) => (
           <View key={index} style={styles.batchCard}>
             <View style={styles.batchRow}>
                <View>
@@ -260,6 +305,13 @@ export default function MedicineDetailScreen() {
             </View>
           </View>
         ))}
+
+          </>
+        ) : (
+          <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 40}}>
+            <Text style={{color: colors.text}}>Đang tải dữ liệu...</Text>
+          </View>
+        )}
 
       </ScrollView>
 
@@ -388,7 +440,7 @@ export default function MedicineDetailScreen() {
                 onPress={pickImage}
               >
                 {tempImage ? (
-                  <Image source={{ uri: tempImage }} style={styles.previewImage} resizeMode="cover" />
+                  <Image source={{ uri: tempImage.startsWith('http') || tempImage.startsWith('file://') ? tempImage : `file://${tempImage}` }} style={styles.previewImage} resizeMode="cover" />
                 ) : (
                   <View style={styles.imagePickerPlaceholder}>
                     <MaterialIcons name="add-photo-alternate" size={40} color={colors.primary} />
@@ -468,6 +520,42 @@ export default function MedicineDetailScreen() {
               </View>
             </View>
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Modal Xóa thuốc */}
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, {maxWidth: 350}]}>
+            <MaterialIcons name="warning" size={48} color="#ef4444" style={{alignSelf: 'center', marginBottom: 16}} />
+            <Text style={[styles.modalTitle, {color: '#ef4444'}]}>Xác nhận xóa thuốc</Text>
+            <Text style={{color: colors.text, textAlign: 'center', marginBottom: 20, lineHeight: 20}}>
+              Bạn có chắc chắn muốn xóa <Text style={{fontWeight: 'bold'}}>{medicine.name}</Text> khỏi hệ thống?
+            </Text>
+            <Text style={{color: SEMANTIC.textGray, fontSize: 13, textAlign: 'center', marginBottom: 20}}>
+              ⚠️ Hành động này không thể hoàn tác!
+            </Text>
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.cancelBtn]}
+                onPress={() => setShowDeleteModal(false)}
+              >
+                <Text style={styles.cancelBtnText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalBtn, {backgroundColor: '#ef4444'}]}
+                onPress={handleDeleteMedicine}
+              >
+                <Text style={styles.confirmBtnText}>Xóa</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
     </View>

@@ -1,6 +1,6 @@
 import { Invoice } from '@/types/invoice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 const INVOICES_KEY = 'invoices';
 
@@ -9,11 +9,7 @@ export function useInvoices() {
   const [loading, setLoading] = useState(true);
 
   // Load invoices from AsyncStorage
-  useEffect(() => {
-    loadInvoices();
-  }, []);
-
-  const loadInvoices = async () => {
+  const loadInvoices = useCallback(async () => {
     try {
       const stored = await AsyncStorage.getItem(INVOICES_KEY);
       if (stored) {
@@ -25,11 +21,17 @@ export function useInvoices() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const saveInvoice = async (invoice: Invoice) => {
+  useEffect(() => {
+    loadInvoices();
+  }, [loadInvoices]);
+
+  const saveInvoice = useCallback(async (invoice: Invoice) => {
     try {
-      const updatedInvoices = [invoice, ...invoices];
+      const stored = await AsyncStorage.getItem(INVOICES_KEY);
+      const existing: Invoice[] = stored ? JSON.parse(stored) : [];
+      const updatedInvoices = [invoice, ...existing];
       await AsyncStorage.setItem(INVOICES_KEY, JSON.stringify(updatedInvoices));
       setInvoices(updatedInvoices);
       return invoice;
@@ -37,21 +39,33 @@ export function useInvoices() {
       console.error('Error saving invoice:', error);
       throw error;
     }
-  };
+  }, []);
 
-  const getInvoiceById = (id: string) => {
+  const getInvoiceById = useCallback((id: string) => {
     return invoices.find(inv => inv.id === id);
-  };
+  }, [invoices]);
 
-  const getRetailInvoices = () => {
+  const getRetailInvoices = useCallback(() => {
     return invoices.filter(inv => inv.type === 'retail');
-  };
+  }, [invoices]);
 
-  const getInvoicesByType = (type: Invoice['type']) => {
+  const getInvoicesByType = useCallback((type: Invoice['type']) => {
     return invoices.filter(inv => inv.type === type);
-  };
+  }, [invoices]);
 
-  const deleteInvoice = async (id: string) => {
+  const updateInvoice = useCallback(async (id: string, updates: Partial<Invoice>) => {
+    try {
+      const updatedInvoices = invoices.map(inv => inv.id === id ? { ...inv, ...updates, updatedAt: new Date().toISOString() } : inv);
+      await AsyncStorage.setItem(INVOICES_KEY, JSON.stringify(updatedInvoices));
+      setInvoices(updatedInvoices);
+      return updatedInvoices.find(inv => inv.id === id) || null;
+    } catch (error) {
+      console.error('Error updating invoice:', error);
+      throw error;
+    }
+  }, [invoices]);
+
+  const deleteInvoice = useCallback(async (id: string) => {
     try {
       const updatedInvoices = invoices.filter(inv => inv.id !== id);
       await AsyncStorage.setItem(INVOICES_KEY, JSON.stringify(updatedInvoices));
@@ -60,7 +74,7 @@ export function useInvoices() {
       console.error('Error deleting invoice:', error);
       throw error;
     }
-  };
+  }, [invoices]);
 
   return {
     invoices,
@@ -70,6 +84,7 @@ export function useInvoices() {
     getInvoiceById,
     getRetailInvoices,
     getInvoicesByType,
+    updateInvoice,
     deleteInvoice,
   };
 }

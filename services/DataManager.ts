@@ -1,7 +1,10 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import pharmacyData from '@/data/pharmacy.json';
 import { Customer } from '@/types/customer';
 import { Invoice, PurchaseOrder } from '@/types/invoice';
 import { Medicine } from '@/types/medicine';
+
+const STORAGE_KEY = 'pharmacy_data_v1';
 
 // 1. Định nghĩa Interface
 export interface Employee {
@@ -76,48 +79,51 @@ class DataManager {
   ];
 
   constructor() {
-    // Load dữ liệu ban đầu từ pharmacy.json
+    // Load dữ liệu ban đầu từ pharmacy.json (sẽ override bởi AsyncStorage khi initialize)
     this.data = pharmacyData as unknown as PharmacyData;
-    
-    // Ưu tiên load từ localStorage (nếu có dữ liệu đã lưu)
-    this.loadFromLocalStorage();
-    
-    // Nếu không có data trong localStorage, dùng pharmacy.json và save lại (web only)
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined' && !localStorage.getItem('pharmacyData')) {
-      this.saveToLocalStorage();
-    }
-    
     this.initializeMissingData(); 
   }
 
-  // --- STORAGE HANDLERS ---
-  private loadFromLocalStorage(): void {
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      const savedData = localStorage.getItem('pharmacyData');
-      if (savedData) {
-        try {
-          const parsed = JSON.parse(savedData);
-          // Kiểm tra xem có đủ thuốc không (nếu < 10 thuốc thì reload từ pharmacy.json)
-          if (!parsed.medicines || parsed.medicines.length < 10) {
-            console.log('Reloading data from pharmacy.json...');
-            this.data = pharmacyData as unknown as PharmacyData;
-          } else {
-            this.data = parsed;
-          }
-        } catch (error) {
-          console.error('Error loading data:', error);
-          this.data = pharmacyData as unknown as PharmacyData;
+  // Async initialization: gọi này khi app khởi động
+  async initialize(): Promise<void> {
+    try {
+      // Ưu tiên load từ AsyncStorage (mobile)
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.medicines && parsed.medicines.length > 0) {
+          this.data = parsed;
+          console.log('Loaded data from AsyncStorage');
+          return;
         }
       }
+    } catch (error) {
+      console.warn('Error loading from AsyncStorage:', error);
+    }
+
+    // Fallback: dùng pharmacy.json và save lại
+    this.data = pharmacyData as unknown as PharmacyData;
+    this.initializeMissingData();
+    await this.saveToAsyncStorage();
+    console.log('Initialized with pharmacy.json and saved to AsyncStorage');
+  }
+
+  // --- STORAGE HANDLERS ---
+  private async saveToAsyncStorage(): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+    } catch (error) {
+      console.error('Error saving to AsyncStorage:', error);
     }
   }
 
   private saveToLocalStorage(): void {
+    // Web only
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem('pharmacyData', JSON.stringify(this.data));
       } catch (error) {
-        console.error('Error saving data:', error);
+        console.error('Error saving to localStorage:', error);
       }
     }
   }
@@ -235,6 +241,12 @@ class DataManager {
     this.saveToLocalStorage();
   }
 
+  async saveMedicinesAsync(medicines: Medicine[]): Promise<void> {
+    this.data.medicines = medicines;
+    await this.saveToAsyncStorage();
+    this.saveToLocalStorage();
+  }
+
   getMedicineById(id: string): Medicine | undefined {
     return this.data.medicines.find((m) => m.id === id);
   }
@@ -247,6 +259,19 @@ class DataManager {
       updatedAt: new Date().toISOString(),
     };
     this.data.medicines.push(newMedicine);
+    this.saveToLocalStorage();
+    return newMedicine;
+  }
+
+  async addMedicineAsync(medicine: Omit<Medicine, 'id' | 'createdAt' | 'updatedAt'>): Promise<Medicine> {
+    const newMedicine: Medicine = {
+      ...medicine,
+      id: this.generateId('med'),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    this.data.medicines.push(newMedicine);
+    await this.saveToAsyncStorage();
     this.saveToLocalStorage();
     return newMedicine;
   }
@@ -264,11 +289,35 @@ class DataManager {
     return this.data.medicines[index];
   }
 
+  async updateMedicineAsync(id: string, updates: Partial<Medicine>): Promise<Medicine | null> {
+    const index = this.data.medicines.findIndex((m) => m.id === id);
+    if (index === -1) return null;
+
+    this.data.medicines[index] = {
+      ...this.data.medicines[index],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.saveToAsyncStorage();
+    this.saveToLocalStorage();
+    return this.data.medicines[index];
+  }
+
   deleteMedicine(id: string): boolean {
     const index = this.data.medicines.findIndex((m) => m.id === id);
     if (index === -1) return false;
 
     this.data.medicines.splice(index, 1);
+    this.saveToLocalStorage();
+    return true;
+  }
+
+  async deleteMedicineAsync(id: string): Promise<boolean> {
+    const index = this.data.medicines.findIndex((m) => m.id === id);
+    if (index === -1) return false;
+
+    this.data.medicines.splice(index, 1);
+    await this.saveToAsyncStorage();
     this.saveToLocalStorage();
     return true;
   }
