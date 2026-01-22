@@ -36,6 +36,7 @@ export default function POSScreen() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [discountPercent, setDiscountPercent] = useState('0');
   const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
   const [note, setNote] = useState('');
 
@@ -134,6 +135,7 @@ export default function POSScreen() {
     const receipt = {
       id: `HĐ${Date.now()}`,
       customer: customerName || 'Khách lẻ',
+      customerPhone: customerPhone || '',
       items: cart,
       subtotal: payment.subtotal,
       discount: payment.discount,
@@ -150,6 +152,7 @@ export default function POSScreen() {
     // Reset
     setCart([]);
     setCustomerName('');
+    setCustomerPhone('');
     setDiscountPercent('0');
     setNote('');
     setShowPaymentModal(false);
@@ -382,6 +385,17 @@ export default function POSScreen() {
                 placeholder="Tên khách (tùy chọn)"
                 value={customerName}
                 onChangeText={setCustomerName}
+              />
+            </View>
+
+            {/* Customer Phone */}
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Số Điện Thoại</ThemedText>
+              <Input
+                placeholder="Số điện thoại (tùy chọn)"
+                value={customerPhone}
+                onChangeText={setCustomerPhone}
+                keyboardType="phone-pad"
               />
             </View>
 

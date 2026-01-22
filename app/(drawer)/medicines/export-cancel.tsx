@@ -2,8 +2,9 @@ import { useInvoices } from '@/hooks/useInvoices';
 import { dataManager } from '@/services/DataManager';
 import { Invoice, InvoiceItem } from '@/types/invoice';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const THEME = {
@@ -19,7 +20,7 @@ const THEME = {
 
 export default function ExportCancelScreen() {
   const router = useRouter();
-  const { invoices, saveInvoice } = useInvoices();
+  const { invoices, saveInvoice, loadInvoices } = useInvoices();
   const [medicines, setMedicines] = useState<any[]>([]);
   const [selectedMedicine, setSelectedMedicine] = useState<any>(null);
   const [selectedBatch, setSelectedBatch] = useState<any>(null);
@@ -35,6 +36,14 @@ export default function ExportCancelScreen() {
   const [customerPurchases, setCustomerPurchases] = useState<any[]>([]);
   const [availableMedicines, setAvailableMedicines] = useState<any[]>([]);
   const [availableBatches, setAvailableBatches] = useState<any[]>([]);
+  const [customerReturnStats, setCustomerReturnStats] = useState<{ totalPurchased: number; totalReturned: number }>({ totalPurchased: 0, totalReturned: 0 });
+
+  // Reload khi màn hình focus
+  useFocusEffect(
+    useCallback(() => {
+      loadInvoices();
+    }, [loadInvoices])
+  );
 
   useEffect(() => {
     const data = dataManager.getAllMedicines();
@@ -42,10 +51,39 @@ export default function ExportCancelScreen() {
     
     // Lấy danh sách khách hàng từ hóa đơn bán lẻ
     const retailInvoices = invoices.filter(inv => inv.type === 'retail' && inv.status === 'completed');
-    const uniqueCustomers = Array.from(new Set(
-      retailInvoices.map(inv => inv.customerName || 'Khách Vãng Lai')
-    ));
-    setCustomers(uniqueCustomers);
+    const returnInvoices = invoices.filter(inv => inv.type === 'return' && inv.status === 'completed');
+    
+    // Tính tổng số lượng mua và trả cho mỗi khách
+    const customerStats = new Map<string, { purchased: number; returned: number }>();
+    
+    retailInvoices.forEach(invoice => {
+      const customerName = invoice.customerName || 'Khách Vãng Lai';
+      const totalQty = invoice.items.reduce((sum, item) => sum + item.quantity, 0);
+      
+      if (!customerStats.has(customerName)) {
+        customerStats.set(customerName, { purchased: 0, returned: 0 });
+      }
+      const stats = customerStats.get(customerName)!;
+      stats.purchased += totalQty;
+    });
+    
+    returnInvoices.forEach(invoice => {
+      const customerName = invoice.customerName || 'Khách Vãng Lai';
+      const totalQty = invoice.items.reduce((sum, item) => sum + item.quantity, 0);
+      
+      if (!customerStats.has(customerName)) {
+        customerStats.set(customerName, { purchased: 0, returned: 0 });
+      }
+      const stats = customerStats.get(customerName)!;
+      stats.returned += totalQty;
+    });
+    
+    // Chỉ lấy khách hàng còn hàng chưa trả hoàn toàn
+    const filteredCustomers = Array.from(customerStats.entries())
+      .filter(([name, stats]) => stats.purchased > stats.returned)
+      .map(([name]) => name);
+    
+    setCustomers(filteredCustomers);
   }, [invoices]);
 
   // Lọc thuốc và lô khi chọn khách hàng
@@ -53,15 +91,35 @@ export default function ExportCancelScreen() {
     if (!selectedCustomer) {
       setCustomerPurchases([]);
       setAvailableMedicines([]);
+      setCustomerReturnStats({ totalPurchased: 0, totalReturned: 0 });
       return;
     }
 
-    // Lấy tất cả hóa đơn của khách này
+    // Lấy tất cả hóa đơn bán của khách này
     const customerInvoices = invoices.filter(
       inv => inv.type === 'retail' && 
              inv.status === 'completed' && 
              inv.customerName === selectedCustomer
     );
+
+    // Lấy tất cả hóa đơn trả của khách này
+    const customerReturnInvoices = invoices.filter(
+      inv => inv.type === 'return' && 
+             inv.status === 'completed' && 
+             inv.customerName === selectedCustomer
+    );
+
+    // Tính tổng số lượng mua
+    const totalPurchased = customerInvoices.reduce((sum, inv) => 
+      sum + inv.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0
+    );
+
+    // Tính tổng số lượng đã trả
+    const totalReturned = customerReturnInvoices.reduce((sum, inv) => 
+      sum + inv.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0
+    );
+
+    setCustomerReturnStats({ totalPurchased, totalReturned });
 
     // Tổng hợp các item đã mua
     const purchasedItems: any[] = [];
@@ -217,7 +275,7 @@ export default function ExportCancelScreen() {
         `Lô: ${selectedBatch.batchNumber}\n` +
         `Lý do: ${reasonText}`,
         [
-          { text: 'Xem hóa đơn', onPress: () => router.push('/(drawer)/hoa-don/ban-le' as any) },
+          { text: 'Xem hóa đơn', onPress: () => router.push('/(drawer)/hoa-don/tra-hang' as any) },
           { text: 'Đóng', style: 'cancel', onPress: () => router.back() }
         ]
       );
@@ -338,7 +396,12 @@ export default function ExportCancelScreen() {
 
         {/* Số lượng & Ghi chú */}
         <View style={styles.card}>
-          <Text style={styles.label}>Số lượng trả</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Text style={styles.label}>Số lượng trả</Text>
+            <Text style={styles.statsText}>
+              Đã trả: {customerReturnStats.totalReturned} / Còn lại: {customerReturnStats.totalPurchased - customerReturnStats.totalReturned}
+            </Text>
+          </View>
           <TextInput 
             style={styles.input} 
             placeholder="Nhập số lượng..."
@@ -504,6 +567,7 @@ const styles = StyleSheet.create({
 
   card: { backgroundColor: THEME.white, borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: THEME.border },
   label: { fontSize: 14, fontWeight: '500', color: THEME.text, marginBottom: 8 },
+  statsText: { fontSize: 12, color: THEME.textGray, fontStyle: 'italic' },
   
   fakeSelect: { 
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

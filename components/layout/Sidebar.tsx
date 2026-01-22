@@ -2,9 +2,10 @@ import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { dataManager } from '@/services/DataManager';
 import { useAuthStore } from '@/store/authStore';
-import { DrawerContentComponentProps, DrawerContentScrollView } from '@react-navigation/drawer';
+import { DrawerContentComponentProps, DrawerContentScrollView, useDrawerStatus } from '@react-navigation/drawer';
+import { useFocusEffect } from '@react-navigation/native';
 import { usePathname, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
     FadeIn,
@@ -73,7 +74,6 @@ const getMenuData = (expiringCount: number, lowStockCount: number): MenuSection[
   {
     title: 'Hệ thống',
     items: [
-      { label: 'Nhân viên', icon: '👤', route: '/system/employees' },
       { label: 'Cài đặt', icon: '⚙️', route: '/system/settings' },
     ],
   },
@@ -178,16 +178,33 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   const pathname = usePathname();
   const colorScheme = useColorScheme() ?? 'light';
   const { user, logout } = useAuthStore();
+  const drawerStatus = useDrawerStatus();
   
   const [expiringCount, setExpiringCount] = useState(0);
   const [lowStockCount, setLowStockCount] = useState(0);
+  const [shopName, setShopName] = useState(dataManager.getSettings().shopName);
 
-  // Load số lượng thuốc sắp hết hạn và hết hàng
+  // Reload khi drawer focus (khi drawer mở)
+  useFocusEffect(
+    useCallback(() => {
+      setShopName(dataManager.getSettings().shopName);
+    }, [])
+  );
+
+  // Khi drawer mở ra, luôn reload tên cửa hàng để phản ánh thay đổi mới nhất
+  useEffect(() => {
+    if (drawerStatus === 'open') {
+      setShopName(dataManager.getSettings().shopName);
+    }
+  }, [drawerStatus]);
+
+  // Load số lượng thuốc sắp hết hạn, hết hàng, và tên nhà thuốc
   useEffect(() => {
     const expiring = dataManager.getExpiringMedicines(30); // 30 ngày
     const lowStock = dataManager.getLowStockMedicines();
     setExpiringCount(expiring.length);
     setLowStockCount(lowStock.length);
+    setShopName(dataManager.getSettings().shopName);
   }, []);
 
   const menuData = getMenuData(expiringCount, lowStockCount);
@@ -270,7 +287,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
             <Text style={styles.logoIcon}>💊</Text>
           </View>
           <View style={styles.headerText}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Pharmacy Pro</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{shopName}</Text>
             <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Quản lý nhà thuốc</Text>
           </View>
         </TouchableOpacity>

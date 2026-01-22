@@ -2,9 +2,10 @@ import { useTheme } from '@/context/ThemeContext';
 import { useInvoices } from '@/hooks/useInvoices';
 import { dataManager } from '@/services/DataManager';
 import { MaterialIcons } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native';
+import { DrawerActions, useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Platform,
   ScrollView,
@@ -16,6 +17,8 @@ import {
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+
+const PURCHASE_ORDERS_KEY = 'purchase_orders';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -50,20 +53,54 @@ export default function DashboardScreen() {
   const [warnings, setWarnings] = useState<any[]>([]);
   const [categoryStats, setCategoryStats] = useState<any[]>([]);
   const [chartData, setChartData] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
+  const [chartLabels, setChartLabels] = useState<string[]>(['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']);
   const [chartTotal, setChartTotal] = useState(0);
+  const [period, setPeriod] = useState<'7days' | '1month' | '1year'>('7days');
+  const [showPeriodMenu, setShowPeriodMenu] = useState(false);
 
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
   };
 
+  // Reload khi màn hình focus
+  useFocusEffect(
+    useCallback(() => {
+      loadDashboardData();
+    }, [invoices, period])
+  );
+
   useEffect(() => {
     loadDashboardData();
-  }, [invoices]);
+  }, [invoices, period]);
 
-  const loadDashboardData = () => {
+  const loadDashboardData = async () => {
+    // Lấy purchase orders từ AsyncStorage
+    let purchaseOrders: any[] = [];
+    try {
+      const stored = await AsyncStorage.getItem(PURCHASE_ORDERS_KEY);
+      if (stored) {
+        purchaseOrders = JSON.parse(stored);
+      }
+    } catch (error) {
+      console.error('Error loading purchase orders:', error);
+    }
+
     const medicines = dataManager.getAllMedicines();
     const lowStockList = dataManager.getLowStockMedicines();
-    const expiringList = dataManager.getExpiringMedicines(30);
+    
+    // Tính toán thuốc sắp hết hạn (≤ 90 ngày) - khớp với expiring screen
+    const now = new Date();
+    const ninetyDays = 90 * 24 * 60 * 60 * 1000;
+    const expiringList = medicines.filter(med => {
+      const isExpiring = (med.batches || []).some((batch: any) => {
+        if (!batch.expiryDate) return false;
+        const exp = new Date(batch.expiryDate).getTime();
+        const nowTime = now.getTime();
+        // Logic: Đã qua ngày hết hạn OR (Chưa hết hạn nhưng còn < 90 ngày)
+        return exp < nowTime || (exp - nowTime < ninetyDays && exp > nowTime);
+      });
+      return isExpiring;
+    });
     
     // Tính toán doanh thu chính xác từ database
     let totalRevenue = 0;
@@ -88,6 +125,18 @@ export default function DashboardScreen() {
         }
       }
     });
+
+    // Tính purchase orders hôm nay
+    const todayPurchaseOrders = purchaseOrders.filter(po => {
+      const poDate = new Date(po.createdAt || '');
+      poDate.setHours(0, 0, 0, 0);
+      return poDate.getTime() === today.getTime();
+    });
+
+    todayPurchaseOrders.forEach(po => {
+      // Nhập hàng: Trừ ra (chi phí)
+      totalRevenue -= po.total;
+    });
     
     // Tính phần trăm thay đổi (giả lập so với hôm qua)
     const yesterday = new Date(today);
@@ -108,6 +157,17 @@ export default function DashboardScreen() {
         }
       }
     });
+
+    // Tính purchase orders hôm qua
+    const yesterdayPurchaseOrders = purchaseOrders.filter(po => {
+      const poDate = new Date(po.createdAt || '');
+      poDate.setHours(0, 0, 0, 0);
+      return poDate.getTime() === yesterday.getTime();
+    });
+
+    yesterdayPurchaseOrders.forEach(po => {
+      yesterdayRevenue -= po.total;
+    });
     
     const revenueChange = yesterdayRevenue > 0 
       ? ((totalRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 
@@ -121,42 +181,160 @@ export default function DashboardScreen() {
       revenueChange: revenueChange,
     });
 
-    // Tính toán doanh thu 7 ngày
-    const last7Days: number[] = [];
-    let weekTotal = 0;
+    // Tính toán doanh thu theo period
+    let chartDataPoints: number[] = [];
+    let labels: string[] = [];
+    let periodTotal = 0;
     
-    for (let i = 6; i >= 0; i--) {
-      const targetDate = new Date(today);
-      targetDate.setDate(targetDate.getDate() - i);
-      targetDate.setHours(0, 0, 0, 0);
-      
-      const dayInvoices = invoices.filter(inv => {
-        const invDate = new Date(inv.createdAt);
-        invDate.setHours(0, 0, 0, 0);
-        return invDate.getTime() === targetDate.getTime();
-      });
-      
-      let dayRevenue = 0;
-      dayInvoices.forEach(invoice => {
-        if (invoice.status === 'completed') {
-          if (invoice.type === 'retail' || invoice.type === 'wholesale') {
-            dayRevenue += invoice.total;
-          } else if (invoice.type === 'return') {
-            dayRevenue -= invoice.total;
+    if (period === '7days') {
+      // 7 ngày gần nhất
+      for (let i = 6; i >= 0; i--) {
+        const targetDate = new Date(today);
+        targetDate.setDate(targetDate.getDate() - i);
+        targetDate.setHours(0, 0, 0, 0);
+        
+        const dayInvoices = invoices.filter(inv => {
+          const invDate = new Date(inv.createdAt);
+          invDate.setHours(0, 0, 0, 0);
+          return invDate.getTime() === targetDate.getTime();
+        });
+        
+        let dayRevenue = 0;
+        dayInvoices.forEach(invoice => {
+          if (invoice.status === 'completed') {
+            if (invoice.type === 'retail' || invoice.type === 'wholesale') {
+              dayRevenue += invoice.total;
+            } else if (invoice.type === 'return') {
+              dayRevenue -= invoice.total;
+            }
           }
+        });
+
+        // Tính purchase orders cho ngày này
+        const dayPurchaseOrders = purchaseOrders.filter(po => {
+          const poDate = new Date(po.createdAt || '');
+          poDate.setHours(0, 0, 0, 0);
+          return poDate.getTime() === targetDate.getTime();
+        });
+
+        dayPurchaseOrders.forEach(po => {
+          dayRevenue -= po.total;
+        });
+        
+        chartDataPoints.push(Math.round(dayRevenue / 1000));
+        periodTotal += dayRevenue;
+        
+        // Label: T2, T3, ...
+        const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+        labels.push(dayNames[targetDate.getDay()]);
+      }
+    } else if (period === '1month') {
+      // 30 ngày gần nhất, nhóm theo tuần (4 tuần)
+      for (let weekIdx = 3; weekIdx >= 0; weekIdx--) {
+        let weekRevenue = 0;
+        
+        for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+          const targetDate = new Date(today);
+          targetDate.setDate(targetDate.getDate() - (weekIdx * 7 + dayOffset));
+          targetDate.setHours(0, 0, 0, 0);
+          
+          const dayInvoices = invoices.filter(inv => {
+            const invDate = new Date(inv.createdAt);
+            invDate.setHours(0, 0, 0, 0);
+            return invDate.getTime() === targetDate.getTime();
+          });
+          
+          dayInvoices.forEach(invoice => {
+            if (invoice.status === 'completed') {
+              if (invoice.type === 'retail' || invoice.type === 'wholesale') {
+                weekRevenue += invoice.total;
+              } else if (invoice.type === 'return') {
+                weekRevenue -= invoice.total;
+              }
+            }
+          });
+
+          // Tính purchase orders cho ngày này
+          const dayPurchaseOrders = purchaseOrders.filter(po => {
+            const poDate = new Date(po.createdAt || '');
+            poDate.setHours(0, 0, 0, 0);
+            return poDate.getTime() === targetDate.getTime();
+          });
+
+          dayPurchaseOrders.forEach(po => {
+            weekRevenue -= po.total;
+          });
         }
-      });
-      
-      // Chuyển sang nghìn đồng cho biểu đồ dễ đọc
-      last7Days.push(Math.round(dayRevenue / 1000));
-      weekTotal += dayRevenue;
+        
+        chartDataPoints.push(Math.round(weekRevenue / 1000));
+        periodTotal += weekRevenue;
+        labels.push(`T${4 - weekIdx}`);
+      }
+    } else if (period === '1year') {
+      // 12 tháng gần nhất
+      for (let monthOffset = 11; monthOffset >= 0; monthOffset--) {
+        const targetMonth = new Date(today);
+        targetMonth.setMonth(targetMonth.getMonth() - monthOffset);
+        const year = targetMonth.getFullYear();
+        const month = targetMonth.getMonth();
+        
+        let monthRevenue = 0;
+        
+        invoices.forEach(invoice => {
+          const invDate = new Date(invoice.createdAt);
+          if (invDate.getFullYear() === year && invDate.getMonth() === month) {
+            if (invoice.status === 'completed') {
+              if (invoice.type === 'retail' || invoice.type === 'wholesale') {
+                monthRevenue += invoice.total;
+              } else if (invoice.type === 'return') {
+                monthRevenue -= invoice.total;
+              }
+            }
+          }
+        });
+
+        // Tính purchase orders cho tháng này
+        purchaseOrders.forEach(po => {
+          const poDate = new Date(po.createdAt || '');
+          if (poDate.getFullYear() === year && poDate.getMonth() === month) {
+            monthRevenue -= po.total;
+          }
+        });
+        
+        chartDataPoints.push(Math.round(monthRevenue / 1000));
+        periodTotal += monthRevenue;
+        labels.push(`T${month + 1}`);
+      }
     }
     
-    setChartData(last7Days);
-    setChartTotal(weekTotal);
+    setChartData(chartDataPoints.length > 0 ? chartDataPoints : [0]);
+    setChartLabels(labels.length > 0 ? labels : ['']);
+    setChartTotal(periodTotal);
 
     const combinedWarnings = [
-      ...expiringList.map(m => ({ ...m, type: 'expiring', label: 'Sắp hết hạn', date: m.batches?.[0]?.expiryDate })),
+      ...expiringList.map(m => {
+        const earliestBatch = (m.batches || []).reduce((earliest: any, batch: any) => {
+          if (!earliest || !batch.expiryDate) return earliest;
+          const expEarliest = new Date(earliest.expiryDate).getTime();
+          const expBatch = new Date(batch.expiryDate).getTime();
+          return expBatch < expEarliest ? batch : earliest;
+        }, m.batches?.[0]);
+        
+        let expiryStatus = 'normal';
+        if (earliestBatch?.expiryDate) {
+          const exp = new Date(earliestBatch.expiryDate).getTime();
+          const nowTime = now.getTime();
+          if (exp < nowTime) {
+            expiryStatus = 'expired';
+          } else if (exp - nowTime < 60 * 24 * 60 * 60 * 1000) {
+            expiryStatus = 'urgent';
+          } else if (exp - nowTime < 90 * 24 * 60 * 60 * 1000) {
+            expiryStatus = 'warning';
+          }
+        }
+        
+        return { ...m, type: 'expiring', expiryStatus, label: 'Sắp hết hạn', date: earliestBatch?.expiryDate };
+      }),
       ...lowStockList.map(m => ({ ...m, type: 'low_stock', label: 'Sắp hết hàng', stock: (m.batches || []).reduce((s: number, b: any) => s + b.quantity, 0) }))
     ].slice(0, 5);
     setWarnings(combinedWarnings);
@@ -215,6 +393,12 @@ export default function DashboardScreen() {
     </View>
   );
 
+  const getPeriodLabel = () => {
+    if (period === '7days') return '7 ngày';
+    if (period === '1month') return '1 tháng';
+    return '1 năm';
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Custom Header */}
@@ -234,7 +418,6 @@ export default function DashboardScreen() {
                 <MaterialIcons name="notifications-none" size={24} color={colors.text} />
                 <View style={[styles.notiBadge, { backgroundColor: SEMANTIC.red, borderColor: colors.card }]} />
              </TouchableOpacity>
-             <View style={[styles.avatar, { borderColor: colors.border }]} />
           </View>
         </View>
       </View>
@@ -285,81 +468,80 @@ export default function DashboardScreen() {
         </View>
 
         {/* 2. Charts Section */}
-        <View style={styles.chartsRow}>
-          {/* Revenue Chart */}
-          <Animated.View 
-            entering={FadeInDown.delay(400)}
-            style={[styles.card, styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        <Animated.View 
+          entering={FadeInDown.delay(400)}
+          style={[styles.card, styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        >
+          <TouchableOpacity 
+            onPress={() => router.push('/(drawer)/reports/revenue' as any)}
+            activeOpacity={0.7}
           >
-            <TouchableOpacity 
-              onPress={() => router.push('/(drawer)/reports/revenue' as any)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardHeader}>
-                <View>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Doanh thu 7 ngày</Text>
-                  <Text style={[styles.cardSubtitle, { color: SEMANTIC.textGray }]}>
-                    Tổng: <Text style={{fontWeight: '700', color: chartTotal >= 0 ? SEMANTIC.green : SEMANTIC.red}}>
-                      {chartTotal >= 0 ? '' : '-'}{Math.abs(chartTotal).toLocaleString()} đ
-                    </Text>
+            <View style={styles.cardHeader}>
+              <View>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Doanh thu {getPeriodLabel()}</Text>
+                <Text style={[styles.cardSubtitle, { color: SEMANTIC.textGray }]}>
+                  Tổng: <Text style={{fontWeight: '700', color: chartTotal >= 0 ? SEMANTIC.green : SEMANTIC.red}}>
+                    {chartTotal >= 0 ? '' : '-'}{Math.abs(chartTotal).toLocaleString()} đ
                   </Text>
-                </View>
-                <View style={[styles.dropdown, { backgroundColor: isDark ? '#333' : '#f0f2f4' }]}>
-                  <Text style={{fontSize: 12, color: colors.text}}>7 ngày</Text>
-                  <MaterialIcons name="keyboard-arrow-down" size={16} color={colors.text} />
-                </View>
+                </Text>
               </View>
-              
-              <LineChart
-                data={{
-                  labels: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
-                  datasets: [{ data: chartData.length > 0 ? chartData : [0, 0, 0, 0, 0, 0, 0] }]
-                }}
-                width={width > 600 ? (width - 64) * 0.6 : width - 64} 
-                height={180}
-                chartConfig={{
-                  backgroundColor: colors.card,
-                  backgroundGradientFrom: colors.card,
-                  backgroundGradientTo: colors.card,
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(19, 127, 236, ${opacity})`,
-                  labelColor: (opacity = 1) => SEMANTIC.textGray,
-                  style: { borderRadius: 16 },
-                  propsForDots: { r: "4", strokeWidth: "2", stroke: colors.primary },
-                  propsForBackgroundLines: { stroke: isDark ? '#444' : '#e3e3e3' } 
-                }}
-                bezier
-                style={{ marginVertical: 8, borderRadius: 16, marginLeft: -10 }}
-                withInnerLines={true}
-                withOuterLines={false}
-                withVerticalLines={false}
-              />
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* Categories Stock */}
-          <Animated.View 
-            entering={FadeInDown.delay(500)} 
-            style={[styles.card, styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          >
-            <TouchableOpacity
-              onPress={() => router.push('/(drawer)/reports/inventory' as any)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardHeader}>
-                <View>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Tồn kho</Text>
-                  <Text style={[styles.cardSubtitle, { color: SEMANTIC.textGray }]}>Hiện tại</Text>
+              <TouchableOpacity 
+                style={[styles.dropdown, { backgroundColor: isDark ? '#333' : '#f0f2f4' }]}
+                onPress={() => setShowPeriodMenu(!showPeriodMenu)}
+              >
+                <Text style={{fontSize: 12, color: colors.text}}>{getPeriodLabel()}</Text>
+                <MaterialIcons name="keyboard-arrow-down" size={16} color={colors.text} />
+              </TouchableOpacity>
+              {showPeriodMenu && (
+                <View style={[styles.periodMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <TouchableOpacity 
+                    style={[styles.periodMenuItem, period === '7days' && { backgroundColor: SEMANTIC.blueBg }]}
+                    onPress={() => { setPeriod('7days'); setShowPeriodMenu(false); }}
+                  >
+                    <Text style={[styles.periodMenuText, { color: period === '7days' ? colors.primary : colors.text }]}>7 ngày</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.periodMenuItem, period === '1month' && { backgroundColor: SEMANTIC.blueBg }]}
+                    onPress={() => { setPeriod('1month'); setShowPeriodMenu(false); }}
+                  >
+                    <Text style={[styles.periodMenuText, { color: period === '1month' ? colors.primary : colors.text }]}>1 tháng</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.periodMenuItem, period === '1year' && { backgroundColor: SEMANTIC.blueBg }]}
+                    onPress={() => { setPeriod('1year'); setShowPeriodMenu(false); }}
+                  >
+                    <Text style={[styles.periodMenuText, { color: period === '1year' ? colors.primary : colors.text }]}>1 năm</Text>
+                  </TouchableOpacity>
                 </View>
-              </View>
-              <View style={{gap: 20, marginTop: 10}}>
-                {categoryStats.map((cat, idx) => (
-                  <ProgressBar key={idx} label={cat.name} percent={cat.percent} color={cat.color} />
-                ))}
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
+              )}
+            </View>
+            
+            <LineChart
+              data={{
+                labels: chartLabels,
+                datasets: [{ data: chartData.length > 0 ? chartData : [0] }]
+              }}
+              width={width > 600 ? (width - 64) * 0.6 : width - 64} 
+              height={180}
+              chartConfig={{
+                backgroundColor: colors.card,
+                backgroundGradientFrom: colors.card,
+                backgroundGradientTo: colors.card,
+                decimalPlaces: 0,
+                color: (opacity = 1) => `rgba(19, 127, 236, ${opacity})`,
+                labelColor: (opacity = 1) => SEMANTIC.textGray,
+                style: { borderRadius: 16 },
+                propsForDots: { r: "4", strokeWidth: "2", stroke: colors.primary },
+                propsForBackgroundLines: { stroke: isDark ? '#444' : '#e3e3e3' } 
+              }}
+              bezier
+              style={{ marginVertical: 8, borderRadius: 16, marginLeft: -10 }}
+              withInnerLines={true}
+              withOuterLines={false}
+              withVerticalLines={false}
+            />
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* 3. Warning Table */}
         <Animated.View entering={FadeInDown.delay(600)} style={styles.warningSection}>
@@ -396,12 +578,22 @@ export default function DashboardScreen() {
 
                 <View style={{flex: 1.5}}>
                   <View style={[styles.statusBadge, 
-                    { backgroundColor: item.type === 'expiring' ? SEMANTIC.redBg : SEMANTIC.orangeBg }
+                    { backgroundColor: 
+                        item.type === 'expiring' 
+                          ? (item.expiryStatus === 'expired' || item.expiryStatus === 'urgent' ? SEMANTIC.redBg : '#fff7ed')
+                          : SEMANTIC.orangeBg
+                    }
                   ]}>
                     <Text style={[styles.statusText, 
-                      { color: item.type === 'expiring' ? SEMANTIC.red : SEMANTIC.orange }
+                      { color: 
+                          item.type === 'expiring'
+                            ? (item.expiryStatus === 'expired' || item.expiryStatus === 'urgent' ? SEMANTIC.red : SEMANTIC.orange)
+                            : SEMANTIC.orange
+                      }
                     ]}>
-                      {item.type === 'expiring' ? 'Sắp hết hạn' : 'Sắp hết hàng'}
+                      {item.type === 'expiring' 
+                        ? (item.expiryStatus === 'expired' ? 'Đã hết hạn' : item.expiryStatus === 'urgent' ? 'Sắp hết hạn' : 'Gần hết hạn')
+                        : 'Sắp hết hàng'}
                     </Text>
                   </View>
                   <Text style={{fontSize: 11, color: SEMANTIC.textGray, marginTop: 2}}>
@@ -471,6 +663,9 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: 'bold' },
   cardSubtitle: { fontSize: 13, marginTop: 2 },
   dropdown: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4 },
+  periodMenu: { position: 'absolute', top: 40, right: 16, borderRadius: 8, borderWidth: 1, overflow: 'hidden', zIndex: 999, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5 },
+  periodMenuItem: { paddingHorizontal: 16, paddingVertical: 10, minWidth: 100 },
+  periodMenuText: { fontSize: 13, fontWeight: '500' },
   
   // Progress Bar
   progressContainer: { gap: 6 },

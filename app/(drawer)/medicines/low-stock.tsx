@@ -22,10 +22,12 @@ export default function LowStockScreen() {
   const router = useRouter();
   const [lowStockList, setLowStockList] = useState<any[]>([]);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showSuggestModal, setShowSuggestModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [importQty, setImportQty] = useState('');
   const [importPrice, setImportPrice] = useState('');
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+  const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
 
   const loadData = () => {
     const all = dataManager.getAllMedicines();
@@ -46,6 +48,27 @@ export default function LowStockScreen() {
     setImportQty('');
     setImportPrice(item.price?.toString() || '');
     setShowImportModal(true);
+  };
+
+  // Heuristic “AI” gợi ý nhập hàng
+  const generateSuggestions = () => {
+    const suggestions = lowStockList.map(item => {
+      const total = item.batches ? item.batches.reduce((sum:number, b:any) => sum + b.quantity, 0) : 0;
+      const minStock = typeof item.minStock === 'number' ? item.minStock : 10;
+      const safety = Math.max(2, Math.round(minStock * 0.2));
+      const suggestedQty = Math.max(minStock + safety - total, safety);
+      return {
+        id: item.id,
+        name: item.name,
+        unit: item.unit,
+        current: total,
+        minStock,
+        suggestedQty,
+        reason: `Tồn ${total}/${minStock}. Đề xuất nhập ${suggestedQty} để đạt mức an toàn +20%.`
+      };
+    });
+    setAiSuggestions(suggestions);
+    setShowSuggestModal(true);
   };
 
   const confirmImport = () => {
@@ -139,7 +162,6 @@ export default function LowStockScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Sắp hết hàng</Text>
         <TouchableOpacity onPress={() => router.push('/medicines/add' as any)}>
-           <MaterialIcons name="add" size={24} color={THEME.primary} />
         </TouchableOpacity>
       </View>
 
@@ -147,6 +169,10 @@ export default function LowStockScreen() {
         <Text style={styles.summaryText}>
           Có <Text style={{fontWeight: 'bold', color: THEME.orange}}>{lowStockList.length}</Text> thuốc dưới định mức tồn kho.
         </Text>
+        <TouchableOpacity style={styles.aiBtn} onPress={generateSuggestions}>
+          <MaterialIcons name="lightbulb" size={18} color={THEME.white} />
+          <Text style={styles.aiBtnText}>Gợi ý nhập (AI)</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -208,6 +234,46 @@ export default function LowStockScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Modal Gợi ý nhập */}
+      <Modal
+        visible={showSuggestModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSuggestModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Gợi ý nhập hàng (AI)</Text>
+            <View style={{ maxHeight: 320 }}>
+              <FlatList
+                data={aiSuggestions}
+                keyExtractor={item => item.id}
+                renderItem={({ item }) => (
+                  <View style={styles.suggestRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.medName, { marginBottom: 4 }]}>{item.name}</Text>
+                      <Text style={styles.medUnit}>Tồn: {item.current} / Định mức: {item.minStock}</Text>
+                      <Text style={[styles.medUnit, { color: THEME.orange }]}>{item.reason}</Text>
+                    </View>
+                    <View style={styles.suggestBadge}>
+                      <Text style={styles.suggestText}>+{item.suggestedQty} {item.unit || ''}</Text>
+                    </View>
+                  </View>
+                )}
+              />
+            </View>
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.cancelBtn]}
+                onPress={() => setShowSuggestModal(false)}
+              >
+                <Text style={styles.cancelBtnText}>Đóng</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -223,6 +289,8 @@ const styles = StyleSheet.create({
   
   summaryBox: { padding: 16, backgroundColor: THEME.orangeBg, margin: 16, borderRadius: 8 },
   summaryText: { color: '#c2410c', fontSize: 14 },
+  aiBtn: { marginTop: 12, backgroundColor: THEME.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start' },
+  aiBtnText: { color: THEME.white, fontWeight: '600' },
 
   listContent: { paddingHorizontal: 16, paddingBottom: 16, gap: 12 },
   
@@ -279,4 +347,9 @@ const styles = StyleSheet.create({
   cancelBtnText: { fontSize: 14, fontWeight: '600', color: THEME.textGray },
   confirmBtn: { backgroundColor: THEME.primary },
   confirmBtnText: { fontSize: 14, fontWeight: '600', color: THEME.white },
+
+  // Suggestion rows
+  suggestRow: { flexDirection: 'row', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: THEME.border },
+  suggestBadge: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: THEME.blueBg, borderRadius: 8, justifyContent: 'center' },
+  suggestText: { color: THEME.primary, fontWeight: '700' },
 });

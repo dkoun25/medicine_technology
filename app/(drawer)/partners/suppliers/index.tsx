@@ -2,9 +2,10 @@ import { dataManager, Supplier } from '@/services/DataManager';
 import { MaterialIcons } from '@expo/vector-icons';
 import { DrawerActions } from '@react-navigation/native';
 import { useNavigation } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-    FlatList, Linking, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View
+  Alert, FlatList, Linking, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -26,23 +27,84 @@ export default function SuppliersScreen() {
   const [search, setSearch] = useState('');
   
   const [modalVisible, setModalVisible] = useState(false);
+  const [detailModal, setDetailModal] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [newForm, setNewForm] = useState({ name: '', phone: '', address: '' });
+
+  const saveSuppliers = useCallback(async (list: Supplier[]) => {
+    try {
+      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+        localStorage.setItem('suppliers', JSON.stringify(list));
+      } else {
+        await AsyncStorage.setItem('suppliers', JSON.stringify(list));
+      }
+    } catch (error) {
+      console.error('Error saving suppliers:', error);
+    }
+  }, []);
+
+  const loadData = useCallback(async () => {
+    try {
+      let stored: string | null = null;
+      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+        stored = localStorage.getItem('suppliers');
+      } else {
+        stored = await AsyncStorage.getItem('suppliers');
+      }
+
+      if (stored) {
+        setSuppliers(JSON.parse(stored));
+      } else {
+        const fromDataManager = dataManager.getAllSuppliers();
+        await saveSuppliers(fromDataManager);
+        setSuppliers(fromDataManager);
+      }
+    } catch (error) {
+      console.error('Error loading suppliers:', error);
+      setSuppliers(dataManager.getAllSuppliers());
+    }
+  }, [saveSuppliers]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
-  const loadData = () => {
-    // FIX: Sửa thành getAllSuppliers()
-    setSuppliers(dataManager.getAllSuppliers());
+  const handleDelete = (supplier: Supplier) => {
+    Alert.alert(
+      'Xác nhận xóa',
+      `Bạn có chắc chắn muốn xóa "${supplier.name}" không?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            const allSuppliers = dataManager.getAllSuppliers();
+            const filtered = allSuppliers.filter(s => s.id !== supplier.id);
+            await saveSuppliers(filtered);
+            setDetailModal(false);
+            loadData();
+            Alert.alert('Thành công', 'Nhà cung cấp đã được xóa');
+          }
+        }
+      ]
+    );
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newForm.name) return alert('Vui lòng nhập tên!');
-    dataManager.addSupplier(newForm);
+    
+    // Thêm vào dataManager
+    const newSupplier = dataManager.addSupplier(newForm);
+    
+    // Đồng bộ vào localStorage
+    const allSuppliers = dataManager.getAllSuppliers();
+    await saveSuppliers(allSuppliers);
+    
     setModalVisible(false);
     setNewForm({ name: '', phone: '', address: '' });
-    loadData(); 
+    loadData();
+    Alert.alert('Thành công', 'Nhà cung cấp đã được thêm');
   };
 
   const filteredData = suppliers.filter(s => 
@@ -52,7 +114,7 @@ export default function SuppliersScreen() {
 
   const renderItem = ({ item, index }: { item: Supplier, index: number }) => (
     <Animated.View entering={FadeInDown.delay(index * 100).duration(400)}>
-      <View style={styles.card}>
+      <TouchableOpacity style={styles.card} onPress={() => { setSelectedSupplier(item); setDetailModal(true); }} activeOpacity={0.7}>
         <View style={styles.cardHeader}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
@@ -81,7 +143,7 @@ export default function SuppliersScreen() {
             <Text style={styles.actionText}>{item.phone}</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     </Animated.View>
   );
 
@@ -145,6 +207,50 @@ export default function SuppliersScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalBtn, {backgroundColor: THEME.primary}]} onPress={handleAdd}>
                 <Text style={{color: 'white'}}>Lưu</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={detailModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={styles.modalTitle}>Chi tiết nhà cung cấp</Text>
+              <TouchableOpacity onPress={() => setDetailModal(false)}>
+                <MaterialIcons name="close" size={24} color={THEME.text} />
+              </TouchableOpacity>
+            </View>
+            {selectedSupplier && (
+              <>
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 12, color: THEME.textGray, marginBottom: 4 }}>Tên</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: THEME.text }}>{selectedSupplier.name}</Text>
+                </View>
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 12, color: THEME.textGray, marginBottom: 4 }}>Số điện thoại</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: THEME.text }}>{selectedSupplier.phone}</Text>
+                </View>
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 12, color: THEME.textGray, marginBottom: 4 }}>Địa chỉ</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: THEME.text }}>{selectedSupplier.address || 'N/A'}</Text>
+                </View>
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 12, color: THEME.textGray, marginBottom: 4 }}>Công nợ</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: selectedSupplier.debt > 0 ? THEME.red : THEME.green }}>
+                    {selectedSupplier.debt ? (selectedSupplier.debt/1000).toFixed(0) + 'k đ' : 'Sạch nợ'}
+                  </Text>
+                </View>
+              </>
+            )}
+            <View style={{flexDirection: 'row', gap: 10, marginTop: 20}}>
+              <TouchableOpacity style={[styles.modalBtn, {backgroundColor: THEME.textGray}]} onPress={() => setDetailModal(false)}>
+                <Text style={{color: 'white'}}>Đóng</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalBtn, {backgroundColor: THEME.red, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4}]} onPress={() => selectedSupplier && handleDelete(selectedSupplier)}>
+                <MaterialIcons name="delete" size={18} color="white" />
+                <Text style={{color: 'white'}}>Xóa</Text>
               </TouchableOpacity>
             </View>
           </View>

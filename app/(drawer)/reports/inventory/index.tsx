@@ -46,14 +46,30 @@ export default function InventoryReportScreen() {
         const isLow = totalQuantity <= med.minStock;
         if (isLow) lowStockCount++;
 
-        // 2. Kiểm tra sắp hết hạn (Đã hết hạn HOẶC còn hạn dưới 90 ngày)
-        const isExpiring = med.batches.some(b => {
-            if (!b.expiryDate) return false;
+        // 2. Kiểm tra trạng thái hạn: đã hết / sắp hết / gần hết
+        let isExpiring = false;
+        let expiryStatus = 'normal'; // 'normal' | 'warning' | 'urgent' | 'expired'
+        
+        med.batches.forEach(b => {
+            if (!b.expiryDate) return;
             const exp = new Date(b.expiryDate).getTime();
             const now = new Date().getTime();
-            const threeMonths = 90 * 24 * 60 * 60 * 1000;
-            // Logic: Đã qua ngày hết hạn OR (Chưa hết hạn nhưng còn < 90 ngày)
-            return exp < now || (exp - now < threeMonths && exp > now); 
+            const sixtyDays = 60 * 24 * 60 * 60 * 1000;
+            const ninetyDays = 90 * 24 * 60 * 60 * 1000;
+            
+            if (exp < now) {
+                // Đã qua hạn
+                isExpiring = true;
+                expiryStatus = 'expired';
+            } else if (exp - now < sixtyDays) {
+                // Sắp hết hạn (< 60 ngày)
+                isExpiring = true;
+                if (expiryStatus !== 'expired') expiryStatus = 'urgent';
+            } else if (exp - now < ninetyDays) {
+                // Gần hết hạn (60-90 ngày)
+                isExpiring = true;
+                if (expiryStatus !== 'expired' && expiryStatus !== 'urgent') expiryStatus = 'warning';
+            }
         });
         if (isExpiring) expiringCount++;
 
@@ -64,7 +80,7 @@ export default function InventoryReportScreen() {
         const medValue = med.batches.reduce((sum, b) => sum + (b.quantity * (unitPrice * 0.7)), 0); 
         totalVal += medValue;
 
-        return { ...med, totalQuantity, isLow, isExpiring };
+        return { ...med, totalQuantity, isLow, isExpiring, expiryStatus };
     });
 
     setStats({
@@ -99,8 +115,22 @@ export default function InventoryReportScreen() {
                </View>
            )}
            {item.isExpiring && (
-               <View style={[styles.tag, { backgroundColor: THEME.redBg }]}>
-                   <Text style={{ color: THEME.red, fontSize: 10, fontWeight: 'bold' }}>Cảnh báo hạn</Text>
+               <View style={[styles.tag, { 
+                 backgroundColor: item.expiryStatus === 'expired' ? THEME.redBg : 
+                                  item.expiryStatus === 'urgent' ? THEME.redBg : 
+                                  '#fff7ed' 
+               }]}>
+                   <Text style={{ 
+                     color: item.expiryStatus === 'expired' ? THEME.red : 
+                            item.expiryStatus === 'urgent' ? THEME.red : 
+                            THEME.orange, 
+                     fontSize: 10, 
+                     fontWeight: 'bold' 
+                   }}>
+                     {item.expiryStatus === 'expired' ? 'Đã hết hạn' : 
+                      item.expiryStatus === 'urgent' ? 'Sắp hết hạn' : 
+                      'Gần hết hạn'}
+                   </Text>
                </View>
            )}
            {!item.isLow && !item.isExpiring && (

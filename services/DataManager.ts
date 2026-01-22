@@ -1,8 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import pharmacyData from '@/data/pharmacy.json';
 import { Customer } from '@/types/customer';
 import { Invoice, PurchaseOrder } from '@/types/invoice';
 import { Medicine } from '@/types/medicine';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = 'pharmacy_data_v1';
 
@@ -109,6 +109,35 @@ class DataManager {
   }
 
   // --- STORAGE HANDLERS ---
+  
+  // Reset về dữ liệu gốc từ pharmacy.json (dev only)
+  async resetToDefault(): Promise<void> {
+    this.data = pharmacyData as unknown as PharmacyData;
+    this.initializeMissingData();
+    await this.saveToAsyncStorage();
+    this.saveToLocalStorage();
+    console.log('✅ Reset to pharmacy.json data successfully');
+  }
+
+  // Force reload từ AsyncStorage (dùng sau khi restore backup)
+  async reloadFromStorage(): Promise<void> {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        this.data = parsed;
+        console.log('✅ Reloaded data from AsyncStorage');
+        return;
+      }
+    } catch (error) {
+      console.error('Error reloading from AsyncStorage:', error);
+    }
+    // Fallback nếu không có dữ liệu
+    this.data = pharmacyData as unknown as PharmacyData;
+    this.initializeMissingData();
+    console.log('⚠️ Fallback to pharmacy.json');
+  }
+
   private async saveToAsyncStorage(): Promise<void> {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
@@ -172,6 +201,8 @@ class DataManager {
 
   updateSettings(newSettings: Partial<AppSettings>) {
     this.data.settings = { ...this.data.settings, ...newSettings };
+    // Persist both for native (AsyncStorage) và web (localStorage)
+    void this.saveToAsyncStorage();
     this.saveToLocalStorage();
   }
 

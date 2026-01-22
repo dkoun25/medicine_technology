@@ -115,40 +115,6 @@ export default function LoginScreen() {
             <Button title={isLoading ? 'Đang đăng nhập...' : 'Đăng Nhập'} onPress={handleLogin} disabled={isLoading} style={styles.loginButton} />
           </View>
 
-          <View style={styles.dividerContainer}>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <ThemedText style={[styles.dividerText, { color: textSecondary }]}>hoặc</ThemedText>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          </View>
-
-          <View style={styles.demoContainer}>
-            <ThemedText style={[styles.demoTitle, { color: colors.text }]}>📋 Tài khoản Demo</ThemedText>
-
-            <TouchableOpacity style={[styles.demoButton, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}30` }]} onPress={() => { setEmail('admin@pharmacy.com'); setPassword('admin123'); }}>
-              <View style={styles.demoRow}>
-                <ThemedText style={[styles.demoButtonText, { color: colors.text }]}> Admin</ThemedText>
-                <ThemedText style={[styles.demoBadge, { color: colors.primary, backgroundColor: `${colors.primary}15` }]}>Full quyền</ThemedText>
-              </View>
-              <ThemedText style={[styles.demoButtonEmail, { color: textSecondary }]}>admin@pharmacy.com</ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.demoButton, { backgroundColor: '#3b82f612', borderColor: '#3b82f630' }]} onPress={() => { setEmail('manager@pharmacy.com'); setPassword('manager123'); }}>
-              <View style={styles.demoRow}>
-                <ThemedText style={[styles.demoButtonText, { color: colors.text }]}> Manager</ThemedText>
-                <ThemedText style={[styles.demoBadge, { color: '#3b82f6', backgroundColor: '#3b82f620' }]}>Quản lý</ThemedText>
-              </View>
-              <ThemedText style={[styles.demoButtonEmail, { color: textSecondary }]}>manager@pharmacy.com</ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.demoButton, { backgroundColor: '#10b98112', borderColor: '#10b98130' }]} onPress={() => { setEmail('staff@pharmacy.com'); setPassword('staff123'); }}>
-              <View style={styles.demoRow}>
-                <ThemedText style={[styles.demoButtonText, { color: colors.text }]}> Staff</ThemedText>
-                <ThemedText style={[styles.demoBadge, { color: '#10b981', backgroundColor: '#10b98120' }]}>Nhân viên</ThemedText>
-              </View>
-              <ThemedText style={[styles.demoButtonEmail, { color: textSecondary }]}>staff@pharmacy.com</ThemedText>
-            </TouchableOpacity>
-          </View>
-
           <View style={styles.footer}>
             <ThemedText style={[styles.footerText, { color: textSecondary }]}>Chưa có tài khoản? </ThemedText>
             <TouchableOpacity onPress={() => router.push('/register')}>
@@ -260,55 +226,6 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     marginTop: 4,
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-    gap: 10,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    opacity: 0.3,
-  },
-  dividerText: {
-    fontSize: 12,
-    opacity: 0.7,
-  },
-  demoContainer: {
-    gap: 10,
-    marginBottom: 12,
-  },
-  demoTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  demoButton: {
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  demoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  demoBadge: {
-    fontSize: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    fontWeight: '700',
-  },
-  demoButtonText: {
-    fontWeight: '700',
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  demoButtonEmail: {
-    fontSize: 12,
-    opacity: 0.8,
   },
   footer: {
     flexDirection: 'row',

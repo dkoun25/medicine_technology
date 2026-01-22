@@ -1,4 +1,5 @@
-import { Employee } from '@/services/DataManager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Employee, dataManager } from '@/services/DataManager';
 import { create } from 'zustand';
 
 interface AuthState {
@@ -72,16 +73,18 @@ export const useAuthStore = create<AuthState>((set: any, get: any) => ({
       if (user && (password === 'admin123' || password === 'manager123' || password === 'staff123')) {
         set({ user, isAuthenticated: true, isLoading: false });
         
-        // Lưu vào localStorage (web). React Native không có localStorage.
-        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-          localStorage.setItem('currentUser', JSON.stringify(user));
+        // Lưu vào AsyncStorage cho React Native
+        try {
+          await AsyncStorage.setItem('currentUser', JSON.stringify(user));
+        } catch (e) {
+          console.error('Failed to save user to AsyncStorage', e);
         }
         return true;
       }
 
-      // Kiểm tra user từ localStorage (test users)
-      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-        const savedUsers = localStorage.getItem('registeredUsers');
+      // Kiểm tra user đã đăng ký (từ AsyncStorage)
+      try {
+        const savedUsers = await AsyncStorage.getItem('registeredUsers');
         if (savedUsers) {
           const users = JSON.parse(savedUsers);
           const foundUser = users.find((u: any) => u.email === email && u.password === password);
@@ -97,10 +100,13 @@ export const useAuthStore = create<AuthState>((set: any, get: any) => ({
               lastLogin: new Date().toISOString(),
             };
             set({ user: userData, isAuthenticated: true, isLoading: false });
-            localStorage.setItem('currentUser', JSON.stringify(userData));
+            await AsyncStorage.setItem('currentUser', JSON.stringify(userData));
+            
             return true;
           }
         }
+      } catch (e) {
+        console.error('Failed to load users from AsyncStorage', e);
       }
 
       set({ error: 'Email hoặc mật khẩu không đúng', isLoading: false });
@@ -116,28 +122,34 @@ export const useAuthStore = create<AuthState>((set: any, get: any) => ({
     try {
       const newUser = {
         id: Math.random().toString(),
-        name: data.fullName || data.name || data.username || data.email,
+        fullName: data.fullName,
         email: data.email,
         phone: data.phone || '',
+        pharmacyName: data.pharmacyName,
+        address: data.address,
         role: data.role || 'staff',
         status: 'active',
         username: data.username || data.email,
         lastLogin: new Date().toISOString(),
-        password: data.password, // Không nên lưu password plain text!
+        password: data.password, // For demo only - don't store plain passwords in production!
       };
 
-      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-        const savedUsers = localStorage.getItem('registeredUsers');
-        const users = savedUsers ? JSON.parse(savedUsers) : [];
-        
-        // Kiểm tra email đã tồn tại
-        if (users.find((u: any) => u.email === data.email)) {
-          set({ error: 'Email này đã được đăng ký', isLoading: false });
-          return false;
-        }
+      // Lưu vào AsyncStorage
+      const savedUsers = await AsyncStorage.getItem('registeredUsers');
+      const users = savedUsers ? JSON.parse(savedUsers) : [];
+      
+      // Kiểm tra email đã tồn tại
+      if (users.find((u: any) => u.email === data.email)) {
+        set({ error: 'Email này đã được đăng ký', isLoading: false });
+        return false;
+      }
 
-        users.push(newUser);
-        localStorage.setItem('registeredUsers', JSON.stringify(users));
+      users.push(newUser);
+      await AsyncStorage.setItem('registeredUsers', JSON.stringify(users));
+      
+      // Sync pharmacyName vào DataManager settings
+      if (data.pharmacyName) {
+        dataManager.updateSettings({ shopName: data.pharmacyName });
       }
 
       set({ isLoading: false });

@@ -19,6 +19,10 @@ export const isValidPhoneVN = (phone: string): boolean => {
   return phoneRegex.test(phone.replace(/[\s-]/g, ''));
 };
 
+// Backward-compatible aliases used in some screens
+export const validateEmail = (email: string): boolean => isValidEmail(email);
+export const validatePhoneVN = (phone: string): boolean => isValidPhoneVN(phone);
+
 /**
  * Kiểm tra số điện thoại quốc tế
  */

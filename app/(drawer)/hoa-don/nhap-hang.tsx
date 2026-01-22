@@ -1,23 +1,43 @@
 import { useTheme } from '@/context/ThemeContext';
+import { PurchaseOrder } from '@/types/invoice';
 import { MaterialIcons } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DrawerActions, useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { FlatList, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-// Dữ liệu giả lập
-const MOCK_IMPORTS = [
-  { id: 'PN00123', supplier: 'Công ty Dược phẩm TW1', date: '2024-05-20T10:30:00Z', total: 15500000, status: 'completed' },
-  { id: 'PN00124', supplier: 'Dược Hậu Giang', date: '2024-05-19T09:15:00Z', total: 8200000, status: 'completed' },
-  { id: 'PN00125', supplier: 'Sanofi Việt Nam', date: '2024-05-18T14:20:00Z', total: 24000000, status: 'pending' },
-];
+const PURCHASE_ORDERS_KEY = 'purchase_orders';
 
 export default function PurchaseInvoicesScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const { colors, isDark } = useTheme();
-  const [imports, setImports] = useState(MOCK_IMPORTS);
+  const [imports, setImports] = useState<PurchaseOrder[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  
+  // Load purchase orders from AsyncStorage
+  const loadPurchaseOrders = useCallback(async () => {
+    try {
+      const stored = await AsyncStorage.getItem(PURCHASE_ORDERS_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setImports(parsed);
+        console.log('Loaded purchase orders:', parsed.length);
+      }
+    } catch (error) {
+      console.error('Error loading purchase orders:', error);
+    }
+  }, []);
+
+  // Reload when screen focuses
+  useFocusEffect(
+    useCallback(() => {
+      loadPurchaseOrders();
+    }, [loadPurchaseOrders])
+  );
   
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
@@ -47,12 +67,13 @@ export default function PurchaseInvoicesScreen() {
     }
   };
 
-  const renderItem = ({ item, index }: { item: any, index: number }) => {
+  const renderItem = ({ item, index }: { item: PurchaseOrder, index: number }) => {
     const status = getStatusStyle(item.status);
     return (
       <Animated.View entering={FadeInDown.delay(index * 50).duration(400)}>
         <TouchableOpacity 
           // Card đổi màu theo theme
+          onPress={() => { setSelectedOrder(item); setShowDetailModal(true); }}
           style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]} 
           activeOpacity={0.7}
         >
@@ -64,8 +85,8 @@ export default function PurchaseInvoicesScreen() {
               </View>
               <View>
                 {/* Text đổi màu */}
-                <Text style={[styles.code, { color: colors.text }]}>{item.id}</Text>
-                <Text style={styles.date}>{new Date(item.date).toLocaleDateString('vi-VN')}</Text>
+                <Text style={[styles.code, { color: colors.text }]}>{item.code}</Text>
+                <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString('vi-VN')}</Text>
               </View>
             </View>
             <View style={[styles.badge, { backgroundColor: status.bg }]}>
@@ -78,7 +99,7 @@ export default function PurchaseInvoicesScreen() {
           <View style={styles.cardBody}>
             <View>
               <Text style={styles.label}>Nhà cung cấp</Text>
-              <Text style={[styles.value, { color: colors.text }]}>{item.supplier}</Text>
+              <Text style={[styles.value, { color: colors.text }]}>{item.supplierName}</Text>
             </View>
             <View style={{alignItems: 'flex-end'}}>
               <Text style={styles.label}>Giá trị nhập</Text>
@@ -133,6 +154,91 @@ export default function PurchaseInvoicesScreen() {
         keyExtractor={item => item.id}
         contentContainerStyle={styles.list}
       />
+
+      {/* Modal Chi tiết phiếu nhập */}
+      <Modal
+        visible={showDetailModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDetailModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Chi tiết phiếu nhập</Text>
+              <TouchableOpacity onPress={() => setShowDetailModal(false)}>
+                <MaterialIcons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedOrder && (
+              <>
+                {/* Thông tin chung */}
+                <View style={styles.infoSection}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Thông tin phiếu</Text>
+                  
+                  <View style={styles.infoRow}>
+                    <Text style={[styles.infoLabel, { color: colors.text }]}>Mã phiếu</Text>
+                    <Text style={[styles.infoValue, { color: colors.primary }]}>{selectedOrder.code}</Text>
+                  </View>
+                  
+                  <View style={styles.infoRow}>
+                    <Text style={[styles.infoLabel, { color: colors.text }]}>Nhà cung cấp</Text>
+                    <Text style={[styles.infoValue, { color: colors.text }]}>{selectedOrder.supplierName}</Text>
+                  </View>
+                  
+                  <View style={styles.infoRow}>
+                    <Text style={[styles.infoLabel, { color: colors.text }]}>Ngày nhập</Text>
+                    <Text style={[styles.infoValue, { color: colors.text }]}>{new Date(selectedOrder.createdAt).toLocaleString('vi-VN')}</Text>
+                  </View>
+
+                  <View style={styles.infoRow}>
+                    <Text style={[styles.infoLabel, { color: colors.text }]}>Trạng thái</Text>
+                    <Text style={[styles.infoValue, { color: '#22c55e' }]}>
+                      {selectedOrder.status === 'completed' ? 'Đã nhập kho' : 'Chờ hàng về'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Danh sách thuốc */}
+                <View style={styles.infoSection}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Danh sách thuốc ({selectedOrder.items.length})</Text>
+                  
+                  {selectedOrder.items.map((item, idx) => (
+                    <View key={idx} style={[styles.itemRow, { backgroundColor: isDark ? '#1f2937' : '#f9fafb', borderColor: colors.border }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.itemName, { color: colors.text }]}>{item.medicineName}</Text>
+                        <Text style={[styles.itemBatch, { color: colors.text }]}>Lô: {item.batchNumber}</Text>
+                        <Text style={[styles.itemBatch, { color: colors.text }]}>Hạn: {new Date(item.expiryDate).toLocaleDateString('vi-VN')}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[styles.itemQty, { color: colors.primary }]}>{item.quantity} đơn vị</Text>
+                        <Text style={[styles.itemPrice, { color: colors.text }]}>{item.total.toLocaleString()} ₫</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Tổng tiền */}
+                <View style={[styles.totalSection, { borderTopColor: colors.border }]}>
+                  <View style={styles.totalRow}>
+                    <Text style={[styles.totalLabel, { color: colors.text }]}>Tổng cộng</Text>
+                    <Text style={[styles.totalValue, { color: colors.primary }]}>{selectedOrder.total.toLocaleString()} ₫</Text>
+                  </View>
+                </View>
+
+                {/* Nút đóng */}
+                <TouchableOpacity 
+                  style={[styles.closeBtn, { backgroundColor: colors.primary }]}
+                  onPress={() => setShowDetailModal(false)}
+                >
+                  <Text style={styles.closeBtnText}>Đóng</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -160,4 +266,25 @@ const styles = StyleSheet.create({
   label: { fontSize: 10, color: '#617589' },
   value: { fontSize: 14, fontWeight: '500' },
   total: { fontSize: 16, fontWeight: 'bold' },
+
+  // Modal styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { borderRadius: 16, padding: 20, width: '100%', maxWidth: 500, maxHeight: '80%' },
+  modalTitle: { fontSize: 18, fontWeight: 'bold' },
+  infoSection: { marginTop: 16, marginBottom: 16 },
+  sectionTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 12 },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  infoLabel: { fontSize: 13, fontWeight: '500' },
+  infoValue: { fontSize: 13, fontWeight: '600' },
+  itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1 },
+  itemName: { fontSize: 13, fontWeight: '600', marginBottom: 4 },
+  itemBatch: { fontSize: 12, marginTop: 2 },
+  itemQty: { fontSize: 13, fontWeight: 'bold', marginBottom: 4 },
+  itemPrice: { fontSize: 12, fontWeight: '600' },
+  totalSection: { borderTopWidth: 2, paddingTop: 16, marginTop: 16 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  totalLabel: { fontSize: 16, fontWeight: 'bold' },
+  totalValue: { fontSize: 18, fontWeight: 'bold' },
+  closeBtn: { paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 16 },
+  closeBtnText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
 });

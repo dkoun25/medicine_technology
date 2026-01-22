@@ -5,8 +5,10 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { useTheme } from '@/context/ThemeContext';
 import { dataManager } from '@/services/DataManager';
+import { PurchaseOrder } from '@/types/invoice';
 import { formatCurrency } from '@/utils/formatters';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -14,6 +16,7 @@ import { Alert, Dimensions, Modal, Platform, ScrollView, StyleSheet, Text, Touch
 
 const { width } = Dimensions.get('window');
 const isSmallDevice = width < 375;
+const PURCHASE_ORDERS_KEY = 'purchase_orders';
 
 interface ImportBatch {
   medicineId: string;
@@ -102,43 +105,87 @@ export default function ImportScreen() {
     }
   };
 
-  const handleConfirmImport = () => {
+  const handleConfirmImport = async () => {
     if (importBatches.length === 0) {
       Alert.alert('Lỗi', 'Chưa có batch nào để nhập!');
       return;
     }
 
-    // Thêm tất cả batch vào kho
-    importBatches.forEach(batch => {
-      const medicineData = {
-        name: batch.medicineName,
-        category: 'Nhập hàng',
-        activeIngredient: 'Chưa cập nhật',
-        unit: 'Viên',
-        manufacturer: batch.supplier,
-        country: 'Việt Nam',
-        price: batch.unitPrice * 1.3, // Giá bán = giá nhập * 1.3
-        minStock: 10,
-        batches: [{
-          id: `BATCH-${Date.now()}-${Math.random()}`,
-          batchNumber: batch.batchNumber,
-          quantity: batch.quantity,
-          expiryDate: batch.expiryDate,
-          importDate: new Date().toISOString().split('T')[0],
-          costPrice: batch.unitPrice,
-          sellingPrice: batch.unitPrice * 1.3,
-          supplierId: 'SUP-001',
-        }],
-      };
+    try {
+      // Tạo Purchase Order
+      const now = new Date().toISOString();
+      const purchaseOrderCode = `PN${Date.now().toString().slice(-6)}`;
       
-      dataManager.addMedicine(medicineData);
-    });
+      const purchaseOrder: PurchaseOrder = {
+        id: `PO-${Date.now()}`,
+        code: purchaseOrderCode,
+        supplierId: 'SUP-001',
+        supplierName: importBatches[0].supplier,
+        items: importBatches.map(batch => ({
+          medicineId: batch.medicineId,
+          medicineName: batch.medicineName,
+          batchNumber: batch.batchNumber,
+          expiryDate: batch.expiryDate,
+          quantity: batch.quantity,
+          costPrice: batch.unitPrice,
+          total: batch.quantity * batch.unitPrice,
+        })),
+        subtotal: totalImportValue,
+        discount: 0,
+        total: totalImportValue,
+        paid: totalImportValue,
+        debt: 0,
+        status: 'completed',
+        receivedBy: 'Quản lý kho',
+        notes: `Nhập ${totalQuantity} sản phẩm`,
+        createdAt: now,
+        updatedAt: now,
+      };
 
-    // Reset
-    setImportBatches([]);
-    Alert.alert('✅ Nhập hàng thành công!', `Đã nhập ${totalQuantity} sản phẩm với tổng giá trị ${formatCurrency(totalImportValue)}`, [
-      { text: 'OK', onPress: () => router.back() }
-    ]);
+      // Lưu Purchase Order vào AsyncStorage
+      const stored = await AsyncStorage.getItem(PURCHASE_ORDERS_KEY);
+      const existingOrders: PurchaseOrder[] = stored ? JSON.parse(stored) : [];
+      const updatedOrders = [purchaseOrder, ...existingOrders];
+      await AsyncStorage.setItem(PURCHASE_ORDERS_KEY, JSON.stringify(updatedOrders));
+      console.log('Saved purchase order:', purchaseOrder.code);
+
+      // Thêm tất cả batch vào kho
+      importBatches.forEach(batch => {
+        const medicineData = {
+          name: batch.medicineName,
+          category: 'Nhập hàng',
+          activeIngredient: 'Chưa cập nhật',
+          unit: 'Viên',
+          manufacturer: batch.supplier,
+          country: 'Việt Nam',
+          price: batch.unitPrice * 1.3, // Giá bán = giá nhập * 1.3
+          minStock: 10,
+          batches: [{
+            id: `BATCH-${Date.now()}-${Math.random()}`,
+            batchNumber: batch.batchNumber,
+            quantity: batch.quantity,
+            expiryDate: batch.expiryDate,
+            importDate: new Date().toISOString().split('T')[0],
+            costPrice: batch.unitPrice,
+            sellingPrice: batch.unitPrice * 1.3,
+            supplierId: 'SUP-001',
+          }],
+        };
+        
+        dataManager.addMedicine(medicineData);
+      });
+
+      // Reset
+      setImportBatches([]);
+      Alert.alert(
+        '✅ Nhập hàng thành công!', 
+        `Mã phiếu: ${purchaseOrderCode}\nĐã nhập ${totalQuantity} sản phẩm\nTổng giá trị: ${formatCurrency(totalImportValue)}`, 
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+    } catch (error) {
+      console.error('Error saving purchase order:', error);
+      Alert.alert('Lỗi', 'Không thể lưu phiếu nhập hàng');
+    }
   };
 
   const totalImportValue = importBatches.reduce(

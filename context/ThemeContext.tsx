@@ -20,7 +20,18 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     // Load cài đặt từ DataManager khi mở app
     const settings = dataManager.getSettings();
-    setTheme(settings.theme);
+    const storedTheme = settings.theme === 'dark' ? 'dark' : 'light';
+
+    // Nếu đang ở dark, ép về light và lưu lại
+    if (storedTheme === 'dark') {
+      setTheme('light');
+      dataManager.updateSettings({ theme: 'light' });
+    } else {
+      setTheme('light');
+      if (storedTheme !== 'light') {
+        dataManager.updateSettings({ theme: 'light' });
+      }
+    }
   }, []);
 
   const toggleTheme = () => {

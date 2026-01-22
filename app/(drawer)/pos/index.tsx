@@ -31,13 +31,14 @@ export default function POSScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<any[]>([]);
   const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successInvoiceCode, setSuccessInvoiceCode] = useState('');
   const [successTotal, setSuccessTotal] = useState(0);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank_transfer'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer'>('cash');
 
   const SEMANTIC = {
     green: '#22c55e',
@@ -128,6 +129,7 @@ export default function POSScreen() {
         code: invoiceCode,
         type: 'retail',
         customerName: finalCustomerName,
+        customerPhone: customerPhone.trim() || '',
         items: invoiceItems,
         subtotal: totalAmount,
         discount: 0,
@@ -171,6 +173,7 @@ export default function POSScreen() {
       
       clearCart();
       setCustomerName('');
+      setCustomerPhone('');
     } catch (error) {
       console.error('Checkout error:', error);
       alert('Không thể tạo hóa đơn. Vui lòng thử lại.');
@@ -442,6 +445,14 @@ export default function POSScreen() {
               value={customerName}
               onChangeText={setCustomerName}
             />
+            <TextInput
+              style={styles.customerInput}
+              placeholder="Số điện thoại (tùy chọn)"
+              placeholderTextColor={SEMANTIC.textGray}
+              value={customerPhone}
+              onChangeText={setCustomerPhone}
+              keyboardType="phone-pad"
+            />
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Tạm tính:</Text>
               <Text style={styles.summaryValue}>{totalAmount.toLocaleString()} ₫</Text>
@@ -469,15 +480,15 @@ export default function POSScreen() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.payMethodBtn, paymentMethod === 'bank_transfer' && styles.payMethodBtnActive, (cart.length === 0 || isProcessing) && { opacity: 0.6 }]}
+                style={[styles.payMethodBtn, paymentMethod === 'transfer' && styles.payMethodBtnActive, (cart.length === 0 || isProcessing) && { opacity: 0.6 }]}
                 disabled={cart.length === 0 || isProcessing}
                 onPress={() => {
-                  setPaymentMethod('bank_transfer');
+                  setPaymentMethod('transfer');
                   handleCheckout();
                 }}
               >
-                <Text style={[styles.payMethodText, paymentMethod === 'bank_transfer' && styles.payMethodTextActive]}>
-                  {isProcessing && paymentMethod === 'bank_transfer' ? 'ĐANG XỬ LÝ...' : 'Chuyển khoản'}
+                <Text style={[styles.payMethodText, paymentMethod === 'transfer' && styles.payMethodTextActive]}>
+                  {isProcessing && paymentMethod === 'transfer' ? 'ĐANG XỬ LÝ...' : 'Chuyển khoản'}
                 </Text>
               </TouchableOpacity>
             </View>

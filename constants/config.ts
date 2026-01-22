@@ -10,6 +10,20 @@ export const APP_CONFIG = {
   description: 'Ứng dụng quản lý nhà thuốc',
 };
 
+// ===== API CONFIGURATION =====
+export const API_CONFIG = {
+  // Change this to your deployed API URL in production
+  BASE_URL: __DEV__ 
+    ? 'http://192.168.1.109:3001'  // Local development
+    : 'https://your-project.vercel.app', // Production (update after deploy)
+  
+  ENDPOINTS: {
+    SEND_VERIFICATION: '/api/send-verification',
+  },
+  
+  TIMEOUT: 10000, // 10 seconds
+};
+
 // ===== DEFAULTS =====
 export const DEFAULTS = {
   CURRENCY: 'VND',

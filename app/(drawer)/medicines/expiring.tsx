@@ -1,7 +1,8 @@
 import { dataManager } from '@/services/DataManager';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View, Alert, Modal, TextInput } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -29,14 +30,33 @@ export default function ExpiringMedicinesScreen() {
   const [returnQty, setReturnQty] = useState('');
   const [returnReason, setReturnReason] = useState('');
 
-  const loadData = () => {
-    const data = dataManager.getExpiringMedicines ? dataManager.getExpiringMedicines(60) : [];
-    setExpiringList(data);
-  };
+  const loadData = useCallback(() => {
+    // Lấy tất cả thuốc và filter những cái sắp hết hạn (≤ 90 ngày)
+    const allMeds = dataManager.getAllMedicines();
+    const expiring = allMeds.filter(med => {
+      const isExpiring = med.batches.some((b: any) => {
+        if (!b.expiryDate) return false;
+        const exp = new Date(b.expiryDate).getTime();
+        const now = new Date().getTime();
+        const ninetyDays = 90 * 24 * 60 * 60 * 1000;
+        // Logic: Đã qua ngày hết hạn OR (Chưa hết hạn nhưng còn < 90 ngày)
+        return exp < now || (exp - now < ninetyDays && exp > now);
+      });
+      return isExpiring;
+    });
+    setExpiringList(expiring);
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
+
+  // Reload khi màn hình focus
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const handleReturn = (item: any) => {
     setSelectedItem(item);
@@ -71,7 +91,7 @@ export default function ExpiringMedicinesScreen() {
       Alert.alert(
         '✅ Thành công',
         `Đã đổi trả ${returnQty} ${selectedItem.unit || 'đơn vị'} ${selectedItem.name}\nLý do: ${returnReason}`,
-        [{ text: 'OK', onPress: loadData }]
+        [{ text: 'OK', onPress: () => { loadData(); setShowReturnModal(false); } }]
       );
     }
 
@@ -97,8 +117,16 @@ export default function ExpiringMedicinesScreen() {
   };
 
   const renderItem = ({ item, index }: { item: any; index: number }) => {
-    // Lấy batch hết hạn sớm nhất để hiển thị
-    const batch = item.batches && item.batches.length > 0 ? item.batches[0] : null;
+    // Tìm batch có expiryDate sắp nhất (sắp hết hạn nhất)
+    const batch = item.batches && item.batches.length > 0 
+      ? item.batches.reduce((closest: any, b: any) => {
+          if (!b.expiryDate) return closest;
+          const closestDate = new Date(closest?.expiryDate || '9999-12-31').getTime();
+          const bDate = new Date(b.expiryDate).getTime();
+          return bDate < closestDate ? b : closest;
+        }, item.batches[0])
+      : null;
+    
     if (!batch) return null;
 
     const expiryDate = new Date(batch.expiryDate);
@@ -166,9 +194,11 @@ export default function ExpiringMedicinesScreen() {
              <MaterialIcons name="arrow-back" size={24} color={THEME.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Cảnh báo hết hạn</Text>
-          <View style={{width: 24}} /> 
+          <TouchableOpacity onPress={loadData} style={{padding: 4}}>
+            <MaterialIcons name="refresh" size={24} color={THEME.primary} />
+          </TouchableOpacity>
         </View>
-        <Text style={styles.subtitle}>Danh sách thuốc cần xử lý ưu tiên (≤ 60 ngày)</Text>
+        <Text style={styles.subtitle}>Danh sách thuốc cần xử lý ưu tiên (≤ 90 ngày)</Text>
       </View>
 
       <FlatList

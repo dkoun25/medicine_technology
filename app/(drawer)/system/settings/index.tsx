@@ -6,27 +6,31 @@ import { DrawerActions } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View
+  Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
   const router = useRouter();
   const { logout } = useAuthStore();
   // 1. Lấy theme và colors từ context
-  const { colors, isDark, toggleTheme } = useTheme();
+  const { colors, isDark } = useTheme();
+
+  const STORAGE_KEY = 'pharmacy_data_v1';
+  const BACKUP_KEY = 'pharmacy_data_backup_v1';
+  const INVOICES_KEY = 'invoices';
+  const INVOICES_BACKUP_KEY = 'invoices_backup';
+  const PURCHASE_ORDERS_KEY = 'purchase_orders';
+  const PURCHASE_ORDERS_BACKUP_KEY = 'purchase_orders_backup';
 
   // 2. Lấy state từ DataManager
   const [settings, setSettings] = useState(dataManager.getSettings());
   const [isEditingShop, setIsEditingShop] = useState(false);
+  const isEditing = isEditingShop || isEditingAddress;
   const [tempShopName, setTempShopName] = useState(settings.shopName);
-
-  // Giả lập config phân quyền
-  const [permissions, setPermissions] = useState({
-    staffCanDelete: false,
-    staffCanExport: true,
-    managerCanEditPrice: true,
-  });
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [tempShopAddress, setTempShopAddress] = useState(settings.shopAddress);
 
   const updateSetting = (key: string, value: any) => {
     const newSettings = { ...settings, [key]: value };
@@ -35,13 +39,106 @@ export default function SettingsScreen() {
   };
 
   const handleSaveShopInfo = () => {
-    updateSetting('shopName', tempShopName);
+    // Lưu cả tên và địa chỉ cùng lúc để tránh xung đột state
+    const newSettings = { 
+      ...settings, 
+      shopName: tempShopName,
+      shopAddress: tempShopAddress
+    };
+    setSettings(newSettings);
+    dataManager.updateSettings(newSettings);
     setIsEditingShop(false);
+    setIsEditingAddress(false);
+    showToast('✅ Đã lưu thông tin nhà thuốc thành công');
   };
 
   const showToast = (msg: string) => {
     if (Platform.OS === 'web') alert(msg);
     else Alert.alert('Thông báo', msg);
+  };
+
+  const handleBackupNow = async () => {
+    try {
+      // Backup tất cả các keys quan trọng
+      const current = await AsyncStorage.getItem(STORAGE_KEY);
+      const invoices = await AsyncStorage.getItem(INVOICES_KEY);
+      const purchaseOrders = await AsyncStorage.getItem(PURCHASE_ORDERS_KEY);
+      
+      if (!current && !invoices && !purchaseOrders) {
+        showToast('Chưa có dữ liệu để sao lưu.');
+        return;
+      }
+      
+      // Backup từng key
+      if (current) await AsyncStorage.setItem(BACKUP_KEY, current);
+      if (invoices) await AsyncStorage.setItem(INVOICES_BACKUP_KEY, invoices);
+      if (purchaseOrders) await AsyncStorage.setItem(PURCHASE_ORDERS_BACKUP_KEY, purchaseOrders);
+      
+      showToast('✅ Đã sao lưu dữ liệu thành công.');
+    } catch (error) {
+      showToast('❌ Sao lưu thất bại.');
+      console.error('Backup error:', error);
+    }
+  };
+
+  const handleRestoreBackup = async () => {
+    try {
+      const backupData = await AsyncStorage.getItem(BACKUP_KEY);
+      const backupInvoices = await AsyncStorage.getItem(INVOICES_BACKUP_KEY);
+      const backupPurchaseOrders = await AsyncStorage.getItem(PURCHASE_ORDERS_BACKUP_KEY);
+      
+      if (!backupData && !backupInvoices && !backupPurchaseOrders) {
+        showToast('Không tìm thấy bản lưu gần nhất.');
+        return;
+      }
+      
+      // Restore tất cả keys
+      if (backupData) await AsyncStorage.setItem(STORAGE_KEY, backupData);
+      if (backupInvoices) await AsyncStorage.setItem(INVOICES_KEY, backupInvoices);
+      if (backupPurchaseOrders) await AsyncStorage.setItem(PURCHASE_ORDERS_KEY, backupPurchaseOrders);
+      
+      // Force reload dữ liệu từ storage vào memory
+      await dataManager.reloadFromStorage();
+      
+      // Cập nhật lại UI ngay lập tức
+      setSettings(dataManager.getSettings());
+      setTempShopName(dataManager.getSettings().shopName);
+      setTempShopAddress(dataManager.getSettings().shopAddress);
+      
+      showToast('✅ Đã khôi phục bản lưu gần nhất.');
+    } catch (error) {
+      showToast('❌ Khôi phục thất bại.');
+      console.error('Restore error:', error);
+    }
+  };
+
+  const handleResetData = async () => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('⚠️ Xác nhận reset dữ liệu?\n\nTất cả thay đổi sẽ bị xóa và quay về dữ liệu mặc định từ pharmacy.json.');
+      if (confirmed) {
+        await dataManager.resetToDefault();
+        showToast('✅ Đã reset dữ liệu thành công! Vui lòng tải lại trang.');
+        setTimeout(() => window.location.reload(), 1500);
+      }
+    } else {
+      Alert.alert(
+        '⚠️ Reset dữ liệu',
+        'Tất cả thay đổi (thuốc, hóa đơn, khách hàng) sẽ bị xóa và quay về dữ liệu mặc định.\n\nBạn có chắc chắn?',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Reset',
+            style: 'destructive',
+            onPress: async () => {
+              await dataManager.resetToDefault();
+              Alert.alert('✅ Thành công', 'Dữ liệu đã được reset. Vui lòng khởi động lại app.', [
+                { text: 'OK' }
+              ]);
+            },
+          },
+        ]
+      );
+    }
   };
 
   const handleLogout = () => {
@@ -82,30 +179,6 @@ export default function SettingsScreen() {
     }
   };
 
-  // Helper render 1 dòng setting
-  const SettingItem = ({ icon, color, label, type, value, onToggle, subtext }: any) => (
-    <View style={styles.item}>
-      <View style={styles.itemLeft}>
-        <View style={[styles.iconBox, { backgroundColor: color + '20' }]}>
-          <MaterialIcons name={icon} size={20} color={color} />
-        </View>
-        <View>
-            <Text style={[styles.itemLabel, { color: colors.text }]}>{label}</Text>
-            {subtext && <Text style={[styles.itemSub, { color: isDark ? '#9ca3af' : '#617589' }]}>{subtext}</Text>}
-        </View>
-      </View>
-      {type === 'switch' && (
-        <Switch 
-          value={value} 
-          onValueChange={onToggle} 
-          trackColor={{ false: '#e5e7eb', true: colors.primary }} 
-          thumbColor={Platform.OS === 'android' ? '#f4f3f4' : ''}
-        />
-      )}
-      {type === 'arrow' && <MaterialIcons name="chevron-right" size={24} color={isDark ? '#666' : '#9ca3af'} />}
-    </View>
-  );
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -127,16 +200,16 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={{ padding: 16 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={styles.label}>Tên nhà thuốc</Text>
-                {!isEditingShop ? (
-                    <TouchableOpacity onPress={() => setIsEditingShop(true)}>
-                        <Text style={{color: colors.primary, fontWeight: '600'}}>Sửa</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <TouchableOpacity onPress={handleSaveShopInfo}>
-                        <Text style={{color: colors.primary, fontWeight: '600'}}>Lưu</Text>
-                    </TouchableOpacity>
-                )}
+              <Text style={styles.label}>Tên nhà thuốc</Text>
+              {!isEditing ? (
+                <TouchableOpacity onPress={() => setIsEditingShop(true)}>
+                  <Text style={{color: colors.primary, fontWeight: '600'}}>Sửa</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={handleSaveShopInfo}>
+                  <Text style={{color: colors.primary, fontWeight: '600'}}>Lưu</Text>
+                </TouchableOpacity>
+              )}
             </View>
             {isEditingShop ? (
                 <TextInput 
@@ -151,95 +224,44 @@ export default function SettingsScreen() {
             
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             
-            <Text style={styles.label}>Địa chỉ</Text>
-            <Text style={[styles.valueText, { color: colors.text }]}>{settings.shopAddress}</Text>
-            
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            
-            <Text style={styles.label}>Gói đăng ký</Text>
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4}}>
-                <MaterialIcons name="verified" size={16} color="#f59e0b" />
-                <Text style={{fontWeight: 'bold', color: '#f59e0b'}}>Pharmacy Pro (Premium)</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={styles.label}>Địa chỉ</Text>
+              {!isEditingAddress ? (
+                <TouchableOpacity onPress={() => setIsEditingAddress(true)}>
+                  <Text style={{color: colors.primary, fontWeight: '600'}}>Sửa</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={handleSaveShopInfo}>
+                  <Text style={{color: colors.primary, fontWeight: '600'}}>Lưu</Text>
+                </TouchableOpacity>
+              )}
             </View>
+            {isEditingAddress ? (
+              <TextInput 
+                style={[styles.input, { color: colors.text, borderColor: colors.primary }]} 
+                value={tempShopAddress} 
+                onChangeText={setTempShopAddress}
+              />
+            ) : (
+              <Text style={[styles.valueText, { color: colors.text }]}>{settings.shopAddress}</Text>
+            )}
           </View>
         </View>
 
-        {/* SECTION 2: Giao diện & Tiện ích */}
-        <Text style={styles.sectionTitle}>GIAO DIỆN & TIỆN ÍCH</Text>
+        {/* SECTION 3: Sao lưu dữ liệu */}
+        <Text style={styles.sectionTitle}>SAO LƯU DỮ LIỆU</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <SettingItem 
-            icon="dark-mode" color="#6366f1" 
-            label="Chế độ tối (Dark Mode)" 
-            type="switch" 
-            value={isDark} 
-            onToggle={toggleTheme} // QUAN TRỌNG: Gọi hàm toggle từ Context
-          />
+          {/* Backup = upload to cloud */}
+          <TouchableOpacity style={styles.actionRow} onPress={handleBackupNow}>
+            <MaterialIcons name="cloud-download" size={20} color="#0ea5e9" />
+            <Text style={[styles.actionText, { color: colors.text }]}>Sao lưu dữ liệu ngay</Text>
+          </TouchableOpacity>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <SettingItem 
-            icon="notifications" color="#ec4899" 
-            label="Thông báo đẩy" 
-            subtext="Nhận tin khi có đơn hàng mới"
-            type="switch" 
-            value={settings.notifications} 
-            onToggle={() => updateSetting('notifications', !settings.notifications)} 
-          />
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-           <SettingItem 
-            icon="language" color="#10b981" 
-            label="Ngôn ngữ" 
-            subtext="Tiếng Việt (Mặc định)"
-            type="arrow" 
-          />
-        </View>
-
-        {/* SECTION 3: Phân quyền & Bảo mật */}
-        <Text style={styles.sectionTitle}>CẤU HÌNH PHÂN QUYỀN & BẢO MẬT</Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-           <SettingItem 
-            icon="fingerprint" color="#f97316" 
-            label="Đăng nhập sinh trắc học" 
-            type="switch" 
-            value={settings.biometricLogin} 
-            onToggle={() => updateSetting('biometricLogin', !settings.biometricLogin)} 
-          />
-           <View style={[styles.divider, { backgroundColor: colors.border }]} />
-           
-           <View style={{padding: 16}}>
-              <Text style={{fontSize: 13, color: isDark ? '#9ca3af' : '#617589', marginBottom: 12, textTransform: 'uppercase', fontWeight: 'bold'}}>Quyền hạn nhân viên (Staff)</Text>
-              
-              <View style={styles.permRow}>
-                  <Text style={[styles.permText, { color: colors.text }]}>Được phép xóa đơn hàng</Text>
-                  <Switch 
-                    value={permissions.staffCanDelete} 
-                    onValueChange={(v) => setPermissions({...permissions, staffCanDelete: v})}
-                    trackColor={{ false: '#e5e7eb', true: colors.primary }}
-                    style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                  />
-              </View>
-              <View style={styles.permRow}>
-                  <Text style={[styles.permText, { color: colors.text }]}>Được phép xuất file báo cáo</Text>
-                  <Switch 
-                    value={permissions.staffCanExport} 
-                    onValueChange={(v) => setPermissions({...permissions, staffCanExport: v})}
-                    trackColor={{ false: '#e5e7eb', true: colors.primary }}
-                    style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                  />
-              </View>
-           </View>
-        </View>
-
-        {/* SECTION 4: Dữ liệu */}
-        <Text style={styles.sectionTitle}>DỮ LIỆU HỆ THỐNG</Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <TouchableOpacity style={styles.actionRow} onPress={() => showToast('Đang sao lưu dữ liệu...')}>
-                <MaterialIcons name="cloud-upload" size={20} color="#0ea5e9" />
-                <Text style={[styles.actionText, { color: colors.text }]}>Sao lưu dữ liệu ngay</Text>
-            </TouchableOpacity>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <TouchableOpacity style={styles.actionRow} onPress={() => showToast('Đã dọn dẹp bộ nhớ đệm!')}>
-                <MaterialIcons name="cleaning-services" size={20} color="#f59e0b" />
-                <Text style={[styles.actionText, { color: colors.text }]}>Xóa bộ nhớ đệm (Cache)</Text>
-            </TouchableOpacity>
+          {/* Restore = download from cloud */}
+          <TouchableOpacity style={styles.actionRow} onPress={handleRestoreBackup}>
+            <MaterialIcons name="cloud-upload" size={20} color="#0ea5e9" />
+            <Text style={[styles.actionText, { color: colors.text }]}>Tải lên bản lưu gần nhất</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={{ marginTop: 20, alignItems: 'center' }}>

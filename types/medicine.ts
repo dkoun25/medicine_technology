@@ -10,6 +10,24 @@ export type MedicineBatch = {
   location?: string; // Vị trí trong kho
 };
 
+export type PurchaseOrder = {
+  id?: string;
+  code: string;
+  supplierName: string;
+  items: Array<{
+    medicineId: string;
+    medicineName: string;
+    batchNumber: string;
+    expiryDate: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }>;
+  total: number;
+  status: string;
+  createdAt: string;
+};
+
 export type Medicine = {
   id: string;
   name: string;

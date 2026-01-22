@@ -1,12 +1,16 @@
 import { useTheme } from '@/context/ThemeContext';
 import { dataManager } from '@/services/DataManager';
+import { PurchaseOrder } from '@/types/invoice';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
+const PURCHASE_ORDERS_KEY = 'purchase_orders';
 
 export default function MedicineDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -57,7 +61,7 @@ export default function MedicineDetailScreen() {
     loadData();
   }, [id]);
 
-  const handleImport = () => {
+  const handleImport = async () => {
     if (!importQty || parseInt(importQty) <= 0) {
       Alert.alert('Lỗi', 'Vui lòng nhập số lượng hợp lệ');
       return;
@@ -67,26 +71,75 @@ export default function MedicineDetailScreen() {
       return;
     }
 
-    const batchNumber = `BATCH-${Date.now()}`;
-    const newBatch = {
-      batchNumber,
-      quantity: parseInt(importQty),
-      expiryDate,
-      importDate: new Date().toISOString().split('T')[0],
-      importPrice: parseFloat(importPrice) || medicine.price || 0,
-    };
+    try {
+      const quantity = parseInt(importQty);
+      const costPrice = parseFloat(importPrice) || medicine.batches?.[0]?.sellingPrice || 0;
+      const batchNumber = `BATCH-${Date.now()}`;
+      
+      // Tạo Purchase Order
+      const now = new Date().toISOString();
+      const purchaseOrderCode = `PN${Date.now().toString().slice(-6)}`;
+      
+      const purchaseOrder: PurchaseOrder = {
+        id: `PO-${Date.now()}`,
+        code: purchaseOrderCode,
+        supplierId: 'SUP-001',
+        supplierName: medicine.manufacturer || 'Nhà cung cấp',
+        items: [{
+          medicineId: medicine.id,
+          medicineName: medicine.name,
+          batchNumber: batchNumber,
+          expiryDate: expiryDate,
+          quantity: quantity,
+          costPrice: costPrice,
+          total: quantity * costPrice,
+        }],
+        subtotal: quantity * costPrice,
+        discount: 0,
+        total: quantity * costPrice,
+        paid: quantity * costPrice,
+        debt: 0,
+        status: 'completed',
+        receivedBy: 'Quản lý kho',
+        notes: `Nhập thêm hàng cho ${medicine.name}`,
+        createdAt: now,
+        updatedAt: now,
+      };
 
-    const updatedBatches = [...(medicine.batches || []), newBatch];
-    dataManager.updateMedicine(medicine.id, { batches: updatedBatches });
+      // Lưu Purchase Order vào AsyncStorage
+      const stored = await AsyncStorage.getItem(PURCHASE_ORDERS_KEY);
+      const existingOrders: PurchaseOrder[] = stored ? JSON.parse(stored) : [];
+      const updatedOrders = [purchaseOrder, ...existingOrders];
+      await AsyncStorage.setItem(PURCHASE_ORDERS_KEY, JSON.stringify(updatedOrders));
+      console.log('Saved purchase order:', purchaseOrder.code);
 
-    Alert.alert(
-      '✅ Nhập hàng thành công',
-      `Đã nhập ${importQty} ${medicine.unit || 'đơn vị'}\nLô: ${batchNumber}`,
-      [{ text: 'OK', onPress: () => { loadData(); setShowImportModal(false); } }]
-    );
-    setImportQty('');
-    setImportPrice('');
-    setExpiryDate('');
+      // Thêm batch vào medicine
+      const newBatch = {
+        id: `BATCH-${Date.now()}-${Math.random()}`,
+        batchNumber,
+        quantity: quantity,
+        expiryDate,
+        importDate: new Date().toISOString().split('T')[0],
+        costPrice: costPrice,
+        sellingPrice: costPrice * 1.3,
+        supplierId: 'SUP-001',
+      };
+
+      const updatedBatches = [...(medicine.batches || []), newBatch];
+      await dataManager.updateMedicineAsync(medicine.id, { batches: updatedBatches });
+
+      Alert.alert(
+        '✅ Nhập hàng thành công',
+        `Mã phiếu: ${purchaseOrderCode}\nĐã nhập ${quantity} ${medicine.unit || 'đơn vị'}\nLô: ${batchNumber}`,
+        [{ text: 'OK', onPress: () => { loadData(); setShowImportModal(false); } }]
+      );
+      setImportQty('');
+      setImportPrice('');
+      setExpiryDate('');
+    } catch (error) {
+      console.error('Error importing:', error);
+      Alert.alert('Lỗi', 'Không thể nhập hàng');
+    }
   };
 
   const pickImage = async () => {
@@ -125,7 +178,7 @@ export default function MedicineDetailScreen() {
     }
   };
 
-  const handleEditMedicine = () => {
+  const handleEditMedicine = async () => {
     if (!editName.trim()) {
       Alert.alert('Lỗi', 'Tên thuốc không được để trống');
       return;
@@ -140,15 +193,15 @@ export default function MedicineDetailScreen() {
       image: editImage,
     };
 
-    dataManager.updateMedicine(medicine.id, updateData);
+    await dataManager.updateMedicineAsync(medicine.id, updateData);
     Alert.alert('✅ Cập nhật thành công', 'Thông tin thuốc đã được cập nhật', [
       { text: 'OK', onPress: () => { loadData(); setShowEditModal(false); } }
     ]);
   };
 
-  const handleDeleteMedicine = () => {
+  const handleDeleteMedicine = async () => {
     if (!medicine) return;
-    const success = dataManager.deleteMedicine(medicine.id);
+    const success = await dataManager.deleteMedicineAsync(medicine.id);
     if (success) {
       setShowDeleteModal(false);
       router.replace('/medicines' as any);

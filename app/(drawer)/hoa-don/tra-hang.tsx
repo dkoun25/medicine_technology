@@ -2,9 +2,9 @@ import { useTheme } from '@/context/ThemeContext';
 import { useInvoices } from '@/hooks/useInvoices';
 import { Invoice } from '@/types/invoice';
 import { MaterialIcons } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native';
+import { DrawerActions, useFocusEffect } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -12,7 +12,7 @@ export default function ReturnsScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const { colors, isDark } = useTheme();
-  const { invoices } = useInvoices();
+  const { invoices, loadInvoices, deleteInvoice } = useInvoices();
   
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
@@ -21,10 +21,18 @@ export default function ReturnsScreen() {
   const [returns, setReturns] = useState<Invoice[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Reload khi màn hình focus
+  useFocusEffect(
+    useCallback(() => {
+      loadInvoices();
+    }, [loadInvoices])
+  );
+
   // Lọc hóa đơn trả hàng
   useEffect(() => {
     const returnInvoices = invoices.filter(inv => inv.type === 'return');
     setReturns(returnInvoices);
+    console.log('Return invoices loaded:', returnInvoices.length);
   }, [invoices]);
 
   // Lọc theo tìm kiếm
@@ -34,51 +42,83 @@ export default function ReturnsScreen() {
     item.customerName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleDeleteInvoice = (invoice: Invoice) => {
+    Alert.alert(
+      'Xóa phiếu trả?',
+      `Bạn chắc chắn muốn xóa phiếu trả ${invoice.code} của khách ${invoice.customerName}?\n\nHành động này không thể hoàn tác.`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteInvoice(invoice.id);
+              Alert.alert('✅ Thành công', `Đã xóa phiếu trả ${invoice.code}`);
+              loadInvoices();
+            } catch (error) {
+              Alert.alert('❌ Lỗi', 'Không thể xóa phiếu trả');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderItem = ({ item, index }: { item: Invoice, index: number }) => {
     // Lấy lý do từ notes
     const reason = item.notes || 'Không ghi chú';
     
     return (
       <Animated.View entering={FadeInDown.delay(index * 50).duration(400)}>
-        <TouchableOpacity 
-          style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]} 
-          activeOpacity={0.7}
-          onPress={() => {
-            Alert.alert(
-              `Phiếu trả ${item.code}`,
-              `Khách hàng: ${item.customerName}\n` +
-              `Ngày tạo: ${new Date(item.createdAt).toLocaleString('vi-VN')}\n` +
-              `Số lượng SP: ${item.items.length}\n` +
-              `Số tiền hoàn: ${item.total.toLocaleString()} ₫\n` +
-              `Lý do: ${reason}`,
-              [{ text: 'Đóng' }]
-            );
-          }}
-        >
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={[styles.code, { color: colors.text }]}>{item.code}</Text>
-              <Text style={styles.ref}>{new Date(item.createdAt).toLocaleDateString('vi-VN')}</Text>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity 
+            activeOpacity={0.7}
+            onPress={() => {
+              Alert.alert(
+                `Phiếu trả ${item.code}`,
+                `Khách hàng: ${item.customerName}\n` +
+                `Ngày tạo: ${new Date(item.createdAt).toLocaleString('vi-VN')}\n` +
+                `Số lượng SP: ${item.items.length}\n` +
+                `Số tiền hoàn: ${item.total.toLocaleString()} ₫\n` +
+                `Lý do: ${reason}`,
+                [{ text: 'Đóng' }]
+              );
+            }}
+          >
+            <View style={styles.cardHeader}>
+              <View>
+                <Text style={[styles.code, { color: colors.text }]}>{item.code}</Text>
+                <Text style={styles.ref}>{new Date(item.createdAt).toLocaleDateString('vi-VN')}</Text>
+              </View>
+              
+              <View style={[styles.refundBadge, { backgroundColor: isDark ? '#450a0a' : '#fef2f2' }]}>
+                <Text style={styles.refundText}>- {item.total.toLocaleString()} ₫</Text>
+              </View>
             </View>
-            
-            <View style={[styles.refundBadge, { backgroundColor: isDark ? '#450a0a' : '#fef2f2' }]}>
-              <Text style={styles.refundText}>- {item.total.toLocaleString()} ₫</Text>
-            </View>
-          </View>
 
-          <View style={[styles.divider, { backgroundColor: isDark ? '#333' : '#f0f2f5' }]} />
+            <View style={[styles.divider, { backgroundColor: isDark ? '#333' : '#f0f2f5' }]} />
 
-          <View style={styles.cardBody}>
-            <View>
-              <Text style={styles.label}>Khách hàng</Text>
-              <Text style={[styles.value, { color: colors.text }]}>{item.customerName}</Text>
+            <View style={styles.cardBody}>
+              <View>
+                <Text style={styles.label}>Khách hàng</Text>
+                <Text style={[styles.value, { color: colors.text }]}>{item.customerName}</Text>
+              </View>
+              <View style={{alignItems: 'flex-end', flex: 1}}>
+                <Text style={styles.label}>Lý do</Text>
+                <Text style={[styles.reason, { color: colors.text }]} numberOfLines={1}>{reason}</Text>
+              </View>
             </View>
-            <View style={{alignItems: 'flex-end', flex: 1}}>
-              <Text style={styles.label}>Lý do</Text>
-              <Text style={[styles.reason, { color: colors.text }]} numberOfLines={1}>{reason}</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.deleteBtn}
+            onPress={() => handleDeleteInvoice(item)}
+          >
+            <MaterialIcons name="delete-outline" size={20} color="#ef4444" />
+            <Text style={styles.deleteBtnText}>Xóa</Text>
+          </TouchableOpacity>
+        </View>
       </Animated.View>
     );
   };
@@ -162,4 +202,6 @@ const styles = StyleSheet.create({
   reason: { fontSize: 14, fontStyle: 'italic' },
   empty: { alignItems: 'center', marginTop: 50, gap: 8 },
   emptyText: { fontSize: 14 },
+  deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#f0f2f5' },
+  deleteBtnText: { color: '#ef4444', fontWeight: '600', fontSize: 13 },
 });
