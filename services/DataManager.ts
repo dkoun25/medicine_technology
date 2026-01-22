@@ -70,9 +70,9 @@ class DataManager {
 
   // Dữ liệu mặc định cho Employees
   private defaultEmployees: Employee[] = [
-    { id: '1', name: 'Nguyễn Văn Quản Lý', username: 'admin', role: 'admin', phone: '0909123456', status: 'active', lastLogin: '2025-06-15 08:30' },
-    { id: '2', name: 'Trần Thị Thu Ngân', username: 'staff1', role: 'staff', phone: '0909111222', status: 'active', lastLogin: '2025-06-14 14:00' },
-    { id: '3', name: 'Lê Văn Kho', username: 'kho1', role: 'manager', phone: '0909333444', status: 'inactive' },
+    { id: '1', name: 'Nguyễn Văn Quản Lý', username: 'admin', email: 'admin@pharmacy.com', role: 'admin', phone: '0909123456', status: 'active', lastLogin: '2025-06-15 08:30' },
+    { id: '2', name: 'Trần Thị Thu Ngân', username: 'staff1', email: 'staff1@pharmacy.com', role: 'staff', phone: '0909111222', status: 'active', lastLogin: '2025-06-14 14:00' },
+    { id: '3', name: 'Lê Văn Kho', username: 'kho1', email: 'kho1@pharmacy.com', role: 'manager', phone: '0909333444', status: 'inactive' },
   ];
 
   constructor() {
@@ -82,8 +82,8 @@ class DataManager {
     // Ưu tiên load từ localStorage (nếu có dữ liệu đã lưu)
     this.loadFromLocalStorage();
     
-    // Nếu không có data trong localStorage, dùng pharmacy.json và save lại
-    if (typeof window !== 'undefined' && !localStorage.getItem('pharmacyData')) {
+    // Nếu không có data trong localStorage, dùng pharmacy.json và save lại (web only)
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined' && !localStorage.getItem('pharmacyData')) {
       this.saveToLocalStorage();
     }
     
@@ -92,7 +92,7 @@ class DataManager {
 
   // --- STORAGE HANDLERS ---
   private loadFromLocalStorage(): void {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const savedData = localStorage.getItem('pharmacyData');
       if (savedData) {
         try {
@@ -113,7 +113,7 @@ class DataManager {
   }
 
   private saveToLocalStorage(): void {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem('pharmacyData', JSON.stringify(this.data));
       } catch (error) {

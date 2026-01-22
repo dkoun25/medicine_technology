@@ -1,15 +1,18 @@
 import { useTheme } from '@/context/ThemeContext'; // Import context
 import { dataManager } from '@/services/DataManager';
+import { useAuthStore } from '@/store/authStore';
 import { MaterialIcons } from '@expo/vector-icons';
 import { DrawerActions } from '@react-navigation/native';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    Alert, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View
+  Alert, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
+  const router = useRouter();
+  const { logout } = useAuthStore();
   // 1. Lấy theme và colors từ context
   const { colors, isDark, toggleTheme } = useTheme();
 
@@ -39,6 +42,44 @@ export default function SettingsScreen() {
   const showToast = (msg: string) => {
     if (Platform.OS === 'web') alert(msg);
     else Alert.alert('Thông báo', msg);
+  };
+
+  const handleLogout = () => {
+    console.log('🚪 Logout button clicked!');
+    
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Bạn có chắc chắn muốn đăng xuất?');
+      if (confirmed) {
+        console.log('Logging out...');
+        logout();
+        console.log('Navigating to login...');
+        router.replace('/login' as any);
+      } else {
+        console.log('Logout cancelled');
+      }
+    } else {
+      Alert.alert(
+        'Đăng xuất',
+        'Bạn có chắc chắn muốn đăng xuất?',
+        [
+          { 
+            text: 'Hủy', 
+            style: 'cancel',
+            onPress: () => console.log('Logout cancelled')
+          },
+          {
+            text: 'Đăng xuất',
+            style: 'destructive',
+            onPress: () => {
+              console.log('Logging out...');
+              logout();
+              console.log('Navigating to login...');
+              router.replace('/login' as any);
+            },
+          },
+        ]
+      );
+    }
   };
 
   // Helper render 1 dòng setting
@@ -202,7 +243,14 @@ export default function SettingsScreen() {
         </View>
 
         <View style={{ marginTop: 20, alignItems: 'center' }}>
-            <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: isDark ? '#450a0a' : '#fef2f2', borderColor: isDark ? '#7f1d1d' : '#fecaca' }]}>
+            <TouchableOpacity 
+              style={[styles.logoutBtn, { backgroundColor: isDark ? '#450a0a' : '#fef2f2', borderColor: isDark ? '#7f1d1d' : '#fecaca' }]}
+              onPress={() => {
+                console.log('👆 Logout TouchableOpacity pressed');
+                handleLogout();
+              }}
+              activeOpacity={0.6}
+            >
                 <Text style={{ color: '#ef4444', fontWeight: 'bold' }}>Đăng xuất</Text>
             </TouchableOpacity>
             <Text style={{ marginTop: 10, color: '#9ca3af', fontSize: 12 }}>Phiên bản 1.0.2 (Build 20260519)</Text>

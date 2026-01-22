@@ -1,5 +1,5 @@
+import { Employee } from '@/services/DataManager';
 import { create } from 'zustand';
-import { dataManager, Employee } from '@/services/DataManager';
 
 interface AuthState {
   user: Employee | null;
@@ -72,15 +72,15 @@ export const useAuthStore = create<AuthState>((set: any, get: any) => ({
       if (user && (password === 'admin123' || password === 'manager123' || password === 'staff123')) {
         set({ user, isAuthenticated: true, isLoading: false });
         
-        // Lưu vào localStorage
-        if (typeof window !== 'undefined') {
+        // Lưu vào localStorage (web). React Native không có localStorage.
+        if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
           localStorage.setItem('currentUser', JSON.stringify(user));
         }
         return true;
       }
 
       // Kiểm tra user từ localStorage (test users)
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
         const savedUsers = localStorage.getItem('registeredUsers');
         if (savedUsers) {
           const users = JSON.parse(savedUsers);
@@ -126,7 +126,7 @@ export const useAuthStore = create<AuthState>((set: any, get: any) => ({
         password: data.password, // Không nên lưu password plain text!
       };
 
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
         const savedUsers = localStorage.getItem('registeredUsers');
         const users = savedUsers ? JSON.parse(savedUsers) : [];
         
@@ -150,7 +150,7 @@ export const useAuthStore = create<AuthState>((set: any, get: any) => ({
 
   logout: () => {
     set({ user: null, isAuthenticated: false });
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       localStorage.removeItem('currentUser');
     }
   },
@@ -169,7 +169,7 @@ export const useAuthStore = create<AuthState>((set: any, get: any) => ({
   },
 
   restoreSession: () => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const savedUser = localStorage.getItem('currentUser');
       if (savedUser) {
         try {

@@ -2,15 +2,21 @@ import { useTheme } from '@/context/ThemeContext';
 import { useInvoices } from '@/hooks/useInvoices';
 import { Invoice } from '@/types/invoice';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { DrawerActions } from '@react-navigation/native';
+import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 export default function ReturnsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { colors, isDark } = useTheme();
   const { invoices } = useInvoices();
+  
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
   
   const [returns, setReturns] = useState<Invoice[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,7 +45,7 @@ export default function ReturnsScreen() {
           activeOpacity={0.7}
           onPress={() => {
             Alert.alert(
-              `Phiếu trầ ${item.code}`,
+              `Phiếu trả ${item.code}`,
               `Khách hàng: ${item.customerName}\n` +
               `Ngày tạo: ${new Date(item.createdAt).toLocaleString('vi-VN')}\n` +
               `Số lượng SP: ${item.items.length}\n` +
@@ -84,7 +90,14 @@ export default function ReturnsScreen() {
       {/* Header đổi màu */}
       <View style={[styles.header, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.headerTop}>
-          <Text style={[styles.title, { color: colors.text }]}>Trả hàng - Hoàn tiền</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+            {Platform.OS !== 'web' && (
+              <TouchableOpacity onPress={openDrawer} style={{padding: 4}}>
+                <MaterialIcons name="menu" size={28} color={colors.text} />
+              </TouchableOpacity>
+            )}
+            <Text style={[styles.title, { color: colors.text }]}>Trả hàng - Hoàn tiền</Text>
+          </View>
           
           {/* Nút Tạo phiếu: Giữ màu đỏ đặc trưng (#ef4444) */}
           <TouchableOpacity 
@@ -117,7 +130,7 @@ export default function ReturnsScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <MaterialIcons name="assignment-return" size={48} color={colors.border} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Chưa có phiếu trả hàng nào</Text>
+            <Text style={[styles.emptyText, { color: '#617589' }]}>Chưa có phiếu trả hàng nào</Text>
           </View>
         }
       />

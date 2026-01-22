@@ -2,15 +2,21 @@ import { useTheme } from '@/context/ThemeContext';
 import { useInvoices } from '@/hooks/useInvoices';
 import { Invoice } from '@/types/invoice';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { DrawerActions } from '@react-navigation/native';
+import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 export default function RetailInvoicesScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { colors, isDark } = useTheme();
   const { invoices: allInvoices, loading, loadInvoices: reloadInvoices } = useInvoices();
+  
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
   
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredData, setFilteredData] = useState<Invoice[]>([]);
@@ -122,7 +128,14 @@ export default function RetailInvoicesScreen() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.headerTop}>
-          <Text style={[styles.title, { color: colors.text }]}>Hóa đơn bán lẻ</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+            {Platform.OS !== 'web' && (
+              <TouchableOpacity onPress={openDrawer} style={{padding: 4}}>
+                <MaterialIcons name="menu" size={28} color={colors.text} />
+              </TouchableOpacity>
+            )}
+            <Text style={[styles.title, { color: colors.text }]}>Hóa đơn bán lẻ</Text>
+          </View>
           <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.primary }]} onPress={() => router.push('/pos' as any)}>
             <MaterialIcons name="add" size={20} color="#fff" />
             <Text style={styles.addBtnText}>Tạo mới</Text>

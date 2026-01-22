@@ -1,10 +1,10 @@
-import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-// 1. IMPORT HOOK THEME
 import { useTheme } from '@/context/ThemeContext';
+import { MaterialIcons } from '@expo/vector-icons';
+import { DrawerActions } from '@react-navigation/native';
+import { useNavigation, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 // Dữ liệu giả lập
 const MOCK_IMPORTS = [
@@ -15,10 +15,13 @@ const MOCK_IMPORTS = [
 
 export default function PurchaseInvoicesScreen() {
   const router = useRouter();
-  // 2. LẤY MÀU TỪ CONTEXT
+  const navigation = useNavigation();
   const { colors, isDark } = useTheme();
-  
   const [imports, setImports] = useState(MOCK_IMPORTS);
+  
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
 
   // Xử lý màu trạng thái (Status)
   const getStatusStyle = (status: string) => {
@@ -94,7 +97,14 @@ export default function PurchaseInvoicesScreen() {
       {/* Header đổi màu */}
       <View style={[styles.header, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.headerTop}>
-          <Text style={[styles.title, { color: colors.text }]}>Hóa đơn nhập hàng</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+            {Platform.OS !== 'web' && (
+              <TouchableOpacity onPress={openDrawer} style={{padding: 4}}>
+                <MaterialIcons name="menu" size={28} color={colors.text} />
+              </TouchableOpacity>
+            )}
+            <Text style={[styles.title, { color: colors.text }]}>Hóa đơn nhập hàng</Text>
+          </View>
           
           {/* Nút Nhập Hàng: Giữ màu Tím (Purple) đặc trưng */}
           <TouchableOpacity 

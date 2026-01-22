@@ -1,4 +1,4 @@
-import { useTheme } from '@/context/ThemeContext'; // Import hook
+import { useTheme } from '@/context/ThemeContext';
 import { useInvoices } from '@/hooks/useInvoices';
 import { dataManager } from '@/services/DataManager';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -10,7 +10,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   useWindowDimensions
@@ -174,12 +173,16 @@ export default function DashboardScreen() {
 
   // --- Components con ---
 
-  const StatCard = ({ icon, title, value, badge, color, bg, delay }: any) => (
+  const StatCard = ({ icon, title, value, badge, color, bg, delay, onPress }: any) => (
     <Animated.View 
       entering={FadeInDown.delay(delay).duration(500)} 
       style={styles.statCardWrapper}
     >
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <TouchableOpacity 
+        onPress={onPress}
+        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+        activeOpacity={0.7}
+      >
         <View style={styles.statHeader}>
           <View style={[styles.iconBox, { backgroundColor: bg }]}>
             <MaterialIcons name={icon} size={24} color={color} />
@@ -194,7 +197,7 @@ export default function DashboardScreen() {
           <Text style={[styles.statTitle, { color: SEMANTIC.textGray }]}>{title}</Text>
           <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
         </View>
-      </View>
+      </TouchableOpacity>
     </Animated.View>
   );
 
@@ -234,19 +237,9 @@ export default function DashboardScreen() {
              <View style={[styles.avatar, { borderColor: colors.border }]} />
           </View>
         </View>
-        
-        <View style={[styles.searchContainer, { backgroundColor: isDark ? '#333' : '#f0f2f4' }]}>
-          <MaterialIcons name="search" size={20} color={SEMANTIC.textGray} />
-          <TextInput 
-            placeholder="Tìm kiếm thuốc, hóa đơn, khách hàng..." 
-            placeholderTextColor={SEMANTIC.textGray}
-            style={[styles.searchInput, { color: colors.text }]}
-          />
-        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        
         {/* 1. Summary Cards Grid */}
         <View style={styles.grid}>
           <StatCard 
@@ -257,6 +250,7 @@ export default function DashboardScreen() {
             color={colors.primary} 
             bg={SEMANTIC.blueBg} 
             delay={0}
+            onPress={() => router.push('/(drawer)/medicines' as any)}
           />
           <StatCard 
             icon="access-alarm" 
@@ -266,6 +260,7 @@ export default function DashboardScreen() {
             color={SEMANTIC.red} 
             bg={SEMANTIC.redBg} 
             delay={100}
+            onPress={() => router.push('/(drawer)/medicines/expiring' as any)}
           />
           <StatCard 
             icon="warning" 
@@ -275,6 +270,7 @@ export default function DashboardScreen() {
             color={SEMANTIC.orange} 
             bg={SEMANTIC.orangeBg} 
             delay={200}
+            onPress={() => router.push('/(drawer)/medicines/low-stock' as any)}
           />
           <StatCard 
             icon="payments" 
@@ -284,67 +280,84 @@ export default function DashboardScreen() {
             color={stats.todayRevenue >= 0 ? SEMANTIC.green : SEMANTIC.red} 
             bg={stats.todayRevenue >= 0 ? SEMANTIC.greenBg : SEMANTIC.redBg} 
             delay={300}
+            onPress={() => router.push('/(drawer)/reports/revenue' as any)}
           />
         </View>
 
         {/* 2. Charts Section */}
         <View style={styles.chartsRow}>
           {/* Revenue Chart */}
-          <Animated.View entering={FadeInDown.delay(400)} style={[styles.card, styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.cardHeader}>
-              <View>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>Doanh thu 7 ngày</Text>
-                <Text style={[styles.cardSubtitle, { color: SEMANTIC.textGray }]}>
-                  Tổng: <Text style={{fontWeight: '700', color: chartTotal >= 0 ? SEMANTIC.green : SEMANTIC.red}}>
-                    {chartTotal >= 0 ? '' : '-'}{Math.abs(chartTotal).toLocaleString()} đ
+          <Animated.View 
+            entering={FadeInDown.delay(400)}
+            style={[styles.card, styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <TouchableOpacity 
+              onPress={() => router.push('/(drawer)/reports/revenue' as any)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardHeader}>
+                <View>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Doanh thu 7 ngày</Text>
+                  <Text style={[styles.cardSubtitle, { color: SEMANTIC.textGray }]}>
+                    Tổng: <Text style={{fontWeight: '700', color: chartTotal >= 0 ? SEMANTIC.green : SEMANTIC.red}}>
+                      {chartTotal >= 0 ? '' : '-'}{Math.abs(chartTotal).toLocaleString()} đ
+                    </Text>
                   </Text>
-                </Text>
+                </View>
+                <View style={[styles.dropdown, { backgroundColor: isDark ? '#333' : '#f0f2f4' }]}>
+                  <Text style={{fontSize: 12, color: colors.text}}>7 ngày</Text>
+                  <MaterialIcons name="keyboard-arrow-down" size={16} color={colors.text} />
+                </View>
               </View>
-              <View style={[styles.dropdown, { backgroundColor: isDark ? '#333' : '#f0f2f4' }]}>
-                <Text style={{fontSize: 12, color: colors.text}}>7 ngày</Text>
-                <MaterialIcons name="keyboard-arrow-down" size={16} color={colors.text} />
-              </View>
-            </View>
-            
-            <LineChart
-              data={{
-                labels: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
-                datasets: [{ data: chartData.length > 0 ? chartData : [0, 0, 0, 0, 0, 0, 0] }]
-              }}
-              width={width > 600 ? (width - 64) * 0.6 : width - 64} 
-              height={180}
-              chartConfig={{
-                backgroundColor: colors.card,
-                backgroundGradientFrom: colors.card,
-                backgroundGradientTo: colors.card,
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(19, 127, 236, ${opacity})`, // Màu primary
-                labelColor: (opacity = 1) => SEMANTIC.textGray,
-                style: { borderRadius: 16 },
-                propsForDots: { r: "4", strokeWidth: "2", stroke: colors.primary },
-                propsForBackgroundLines: { stroke: isDark ? '#444' : '#e3e3e3' } 
-              }}
-              bezier
-              style={{ marginVertical: 8, borderRadius: 16, marginLeft: -10 }}
-              withInnerLines={true}
-              withOuterLines={false}
-              withVerticalLines={false}
-            />
+              
+              <LineChart
+                data={{
+                  labels: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
+                  datasets: [{ data: chartData.length > 0 ? chartData : [0, 0, 0, 0, 0, 0, 0] }]
+                }}
+                width={width > 600 ? (width - 64) * 0.6 : width - 64} 
+                height={180}
+                chartConfig={{
+                  backgroundColor: colors.card,
+                  backgroundGradientFrom: colors.card,
+                  backgroundGradientTo: colors.card,
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => `rgba(19, 127, 236, ${opacity})`,
+                  labelColor: (opacity = 1) => SEMANTIC.textGray,
+                  style: { borderRadius: 16 },
+                  propsForDots: { r: "4", strokeWidth: "2", stroke: colors.primary },
+                  propsForBackgroundLines: { stroke: isDark ? '#444' : '#e3e3e3' } 
+                }}
+                bezier
+                style={{ marginVertical: 8, borderRadius: 16, marginLeft: -10 }}
+                withInnerLines={true}
+                withOuterLines={false}
+                withVerticalLines={false}
+              />
+            </TouchableOpacity>
           </Animated.View>
 
           {/* Categories Stock */}
-          <Animated.View entering={FadeInDown.delay(500)} style={[styles.card, styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.cardHeader}>
-              <View>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>Tồn kho</Text>
-                <Text style={[styles.cardSubtitle, { color: SEMANTIC.textGray }]}>Hiện tại</Text>
+          <Animated.View 
+            entering={FadeInDown.delay(500)} 
+            style={[styles.card, styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <TouchableOpacity
+              onPress={() => router.push('/(drawer)/reports/inventory' as any)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardHeader}>
+                <View>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Tồn kho</Text>
+                  <Text style={[styles.cardSubtitle, { color: SEMANTIC.textGray }]}>Hiện tại</Text>
+                </View>
               </View>
-            </View>
-            <View style={{gap: 20, marginTop: 10}}>
-              {categoryStats.map((cat, idx) => (
-                <ProgressBar key={idx} label={cat.name} percent={cat.percent} color={cat.color} />
-              ))}
-            </View>
+              <View style={{gap: 20, marginTop: 10}}>
+                {categoryStats.map((cat, idx) => (
+                  <ProgressBar key={idx} label={cat.name} percent={cat.percent} color={cat.color} />
+                ))}
+              </View>
+            </TouchableOpacity>
           </Animated.View>
         </View>
 
@@ -355,7 +368,7 @@ export default function DashboardScreen() {
               <MaterialIcons name="report" size={24} color={SEMANTIC.red} />
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Cảnh báo cần xử lý</Text>
             </View>
-            <TouchableOpacity onPress={() => router.push('/medicines?filter=warning' as any)}>
+            <TouchableOpacity onPress={() => router.push('/medicines/low-stock?filter=warning' as any)}>
               <Text style={{color: colors.primary, fontWeight: '600'}}>Xem tất cả</Text>
             </TouchableOpacity>
           </View>
@@ -429,14 +442,12 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'web' ? 20 : 50, 
     borderBottomWidth: 1, 
   },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0 },
   headerTitle: { fontSize: 24, fontWeight: 'bold' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notiBadge: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, borderWidth: 1 },
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#e2e8f0', borderWidth: 1 },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 8, paddingHorizontal: 12, height: 44, borderWidth: 1, borderColor: 'transparent' },
-  searchInput: { flex: 1, marginLeft: 8, fontSize: 14 },
 
   content: { padding: 16 },
 

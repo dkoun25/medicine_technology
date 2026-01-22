@@ -40,7 +40,7 @@
       "dosage": "1-2 viên/lần, 3-4 lần/ngày",
       "barcode": "8934588012345",
       "minStock": 10,
-      "image": "https://cdn.medigoapp.com/product/panadol_extra.jpg",
+      "image": "https://images.unsplash.com/photo-1582719478145-b0400c91f6b7?auto=format&fit=crop&w=900&q=80",
       "batches": [
         {
           "id": "batch_1",
@@ -71,6 +71,7 @@
       "dosage": "1-2 viên/lần, mỗi 4-6 giờ",
       "barcode": "8934588023456",
       "minStock": 10,
+      "image": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=900&q=80",
       "batches": [
         {
           "id": "batch_2",
@@ -101,6 +102,7 @@
       "dosage": "2-3 viên/lần, 3 lần/ngày",
       "barcode": "8934588034567",
       "minStock": 5,
+      "image": "https://images.unsplash.com/photo-1580281657521-5134d4b4aa66?auto=format&fit=crop&w=900&q=80",
       "batches": [
         {
           "id": "batch_3",
@@ -131,7 +133,7 @@
       "dosage": "1 viên/ngày",
       "barcode": "8934588045678",
       "minStock": 20,
-      "image": "https://cdn.medigoapp.com/product/vitamin_c.jpg",
+      "image": "https://images.unsplash.com/photo-1527610276290-73c2c1d7bd65?auto=format&fit=crop&w=900&q=80",
       "batches": [
         {
           "id": "batch_4",
@@ -162,7 +164,7 @@
       "dosage": "1 viên x 3 lần/ngày",
       "barcode": "8934588056789",
       "minStock": 15,
-      "image": "https://cdn.medigoapp.com/product/amoxicillin.jpg",
+      "image": "https://images.unsplash.com/photo-1582719478248-54e9f2f5be29?auto=format&fit=crop&w=900&q=80",
       "batches": [
         {
           "id": "batch_5",
@@ -193,7 +195,7 @@
       "dosage": "Uống từ từ theo nhu cầu",
       "barcode": "8934588067890",
       "minStock": 25,
-      "image": "https://cdn.medigoapp.com/product/ors.jpg",
+      "image": "https://images.unsplash.com/photo-1610276198568-eb6d0ff53d8c?auto=format&fit=crop&w=900&q=80",
       "batches": [
         {
           "id": "batch_6",
@@ -224,7 +226,7 @@
       "dosage": "1 viên/ngày",
       "barcode": "8934588078901",
       "minStock": 10,
-      "image": "https://cdn.medigoapp.com/product/cetrizine.jpg",
+      "image": "https://images.unsplash.com/photo-1582719478251-09f5c8ab2390?auto=format&fit=crop&w=900&q=80",
       "batches": [
         {
           "id": "batch_7",
@@ -255,7 +257,7 @@
       "dosage": "1-2 nhát/lần khi cần",
       "barcode": "8934588089012",
       "minStock": 5,
-      "image": "https://cdn.medigoapp.com/product/salbutamol.jpg",
+      "image": "https://images.unsplash.com/photo-1582719478187-2f24141f15b3?auto=format&fit=crop&w=900&q=80",
       "batches": [
         {
           "id": "batch_8",
@@ -286,7 +288,7 @@
       "dosage": "Bôi 2-3 lần/ngày",
       "barcode": "8934588090123",
       "minStock": 8,
-      "image": "https://cdn.medigoapp.com/product/mebo.jpg",
+      "image": "https://images.unsplash.com/photo-1580281658629-2bfc0f7bf8bd?auto=format&fit=crop&w=900&q=80",
       "batches": [
         {
           "id": "batch_9",
@@ -317,7 +319,7 @@
       "dosage": "2 viên x 3 lần/ngày",
       "barcode": "8934588001234",
       "minStock": 12,
-      "image": "https://cdn.medigoapp.com/product/eugica.jpg",
+      "image": "https://images.unsplash.com/photo-1582719478473-9fffeeb7c81a?auto=format&fit=crop&w=900&q=80",
       "batches": [
         {
           "id": "batch_10",

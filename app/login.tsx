@@ -1,19 +1,19 @@
-import { useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, useColorScheme } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAuth } from '@/hooks/useAuth';
-import { ThemedText } from '@/components/themed-text';
+﻿import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Colors } from '@/constants/Colors';
+import { useAuth } from '@/hooks/useAuth';
 import { isValidEmail } from '@/utils/validators';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity, useColorScheme, View } from 'react-native';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
   const colorScheme = useColorScheme();
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
@@ -22,6 +22,9 @@ export default function LoginScreen() {
 
   const isDark = colorScheme === 'dark';
   const colors = Colors[isDark ? 'dark' : 'light'];
+  const textSecondary = isDark ? '#cbd5e1' : '#5f6a7d';
+  const accentGreen = '#22c55e';
+  const accentOrange = '#f97316';
 
   const handleLogin = async () => {
     const newErrors: typeof errors = {};
@@ -43,7 +46,6 @@ export default function LoginScreen() {
     if (Object.keys(newErrors).length === 0) {
       setIsLoading(true);
       try {
-        // Gọi hàm login từ store
         const success = await login(email, password);
         if (success) {
           router.replace('/(drawer)/dashboard');
@@ -59,130 +61,100 @@ export default function LoginScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Logo/Header */}
-        <View style={styles.header}>
-          <ThemedText style={styles.title}>💊 Quản Lý Thuốc</ThemedText>
-          <ThemedText style={styles.subtitle}>
-            Hệ thống quản lý cửa hàng bán thuốc
-          </ThemedText>
-        </View>
-
-        {/* Form */}
-        <View style={styles.form}>
-          {/* Email */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Email</ThemedText>
-            <Input
-              placeholder="nhap@email.com"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              editable={!isLoading}
-              style={[
-                styles.input,
-                errors.email && styles.inputError,
-                { borderColor: errors.email ? '#ef4444' : colors.border },
-              ]}
-            />
-            {errors.email && (
-              <ThemedText style={styles.errorText}>{errors.email}</ThemedText>
-            )}
-          </View>
-
-          {/* Password */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Mật khẩu</ThemedText>
-            <View style={styles.passwordContainer}>
-              <Input
-                placeholder="••••••"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                editable={!isLoading}
-                style={[
-                  styles.input,
-                  styles.passwordInput,
-                  errors.password && styles.inputError,
-                  { borderColor: errors.password ? '#ef4444' : colors.border },
-                ]}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
-              >
-                <ThemedText>{showPassword ? '👁️' : '👁️‍🗨️'}</ThemedText>
-              </TouchableOpacity>
+    <ThemedView style={[styles.container, { backgroundColor: colors.background }]}> 
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroWrap}>
+          <View style={[styles.heroCard, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}25` }]}> 
+            <ThemedText style={[styles.badge, { color: colors.primary, borderColor: `${colors.primary}40` }]}>All-in-one Pharmacy POS</ThemedText>
+            <ThemedText style={[styles.title, { color: colors.text }]}>Quản lý nhà thuốc</ThemedText>
+            <ThemedText style={[styles.subtitle, { color: textSecondary }]}>Bán hàng nhanh, kiểm kho chuẩn, báo cáo tức thời.</ThemedText>
+            <View style={styles.heroChips}>
+              <View style={[styles.chip, { backgroundColor: `${colors.primary}15` }]}><ThemedText style={[styles.chipText, { color: colors.primary }]}>POS</ThemedText></View>
+              <View style={[styles.chip, { backgroundColor: `${accentGreen}20` }]}><ThemedText style={[styles.chipText, { color: accentGreen }]}>Kho</ThemedText></View>
+              <View style={[styles.chip, { backgroundColor: `${accentOrange}20` }]}><ThemedText style={[styles.chipText, { color: accentOrange }]}>Báo cáo</ThemedText></View>
             </View>
-            {errors.password && (
-              <ThemedText style={styles.errorText}>{errors.password}</ThemedText>
-            )}
+          </View>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: colors.card ?? colors.backgroundCard ?? '#fff', borderColor: colors.border }]}>
+          <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Đăng nhập</ThemedText>
+          <ThemedText style={[styles.cardSubtitle, { color: textSecondary }]}>Dùng tài khoản demo hoặc email của bạn.</ThemedText>
+
+          <View style={styles.form}>
+            <View style={styles.inputGroup}>
+              <ThemedText style={[styles.label, { color: textSecondary }]}>Email</ThemedText>
+              <Input
+                placeholder="admin@pharmacy.com"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                editable={!isLoading}
+                style={styles.inputText}
+                error={errors.email}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <ThemedText style={[styles.label, { color: textSecondary }]}>Mật khẩu</ThemedText>
+              <View style={styles.passwordContainer}>
+                <Input
+                  placeholder="••••••"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  editable={!isLoading}
+                  style={[styles.inputText, styles.passwordInput]}
+                  error={errors.password}
+                />
+                <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPassword(!showPassword)}>
+                  <ThemedText>{showPassword ? '👁️' : '👁️‍🗨️'}</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <Button title={isLoading ? 'Đang đăng nhập...' : 'Đăng Nhập'} onPress={handleLogin} disabled={isLoading} style={styles.loginButton} />
           </View>
 
-          {/* Login Button */}
-          <Button
-            title={isLoading ? 'Đang đăng nhập...' : 'Đăng Nhập'}
-            onPress={handleLogin}
-            disabled={isLoading}
-            style={styles.loginButton}
-          />
-        </View>
+          <View style={styles.dividerContainer}>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <ThemedText style={[styles.dividerText, { color: textSecondary }]}>hoặc</ThemedText>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          </View>
 
-        {/* Divider */}
-        <View style={styles.dividerContainer}>
-          <View style={[styles.divider, { backgroundColor: colors.text }]} />
-          <ThemedText style={styles.dividerText}>hoặc</ThemedText>
-          <View style={[styles.divider, { backgroundColor: colors.text }]} />
-        </View>
+          <View style={styles.demoContainer}>
+            <ThemedText style={[styles.demoTitle, { color: colors.text }]}>📋 Tài khoản Demo</ThemedText>
 
-        {/* Demo Accounts */}
-        <View style={styles.demoContainer}>
-          <ThemedText style={styles.demoTitle}>📋 Tài khoản Demo</ThemedText>
-          
-          <TouchableOpacity
-            style={[styles.demoButton, { backgroundColor: colors.primary + '20' }]}
-            onPress={() => {
-              setEmail('admin@pharmacy.com');
-              setPassword('admin123');
-            }}
-          >
-            <ThemedText style={styles.demoButtonText}>👨‍💼 Admin</ThemedText>
-            <ThemedText style={styles.demoButtonEmail}>admin@pharmacy.com</ThemedText>
-          </TouchableOpacity>
+            <TouchableOpacity style={[styles.demoButton, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}30` }]} onPress={() => { setEmail('admin@pharmacy.com'); setPassword('admin123'); }}>
+              <View style={styles.demoRow}>
+                <ThemedText style={[styles.demoButtonText, { color: colors.text }]}> Admin</ThemedText>
+                <ThemedText style={[styles.demoBadge, { color: colors.primary, backgroundColor: `${colors.primary}15` }]}>Full quyền</ThemedText>
+              </View>
+              <ThemedText style={[styles.demoButtonEmail, { color: textSecondary }]}>admin@pharmacy.com</ThemedText>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.demoButton, { backgroundColor: '#3b82f6' + '20' }]}
-            onPress={() => {
-              setEmail('manager@pharmacy.com');
-              setPassword('manager123');
-            }}
-          >
-            <ThemedText style={styles.demoButtonText}>📊 Manager</ThemedText>
-            <ThemedText style={styles.demoButtonEmail}>manager@pharmacy.com</ThemedText>
-          </TouchableOpacity>
+            <TouchableOpacity style={[styles.demoButton, { backgroundColor: '#3b82f612', borderColor: '#3b82f630' }]} onPress={() => { setEmail('manager@pharmacy.com'); setPassword('manager123'); }}>
+              <View style={styles.demoRow}>
+                <ThemedText style={[styles.demoButtonText, { color: colors.text }]}> Manager</ThemedText>
+                <ThemedText style={[styles.demoBadge, { color: '#3b82f6', backgroundColor: '#3b82f620' }]}>Quản lý</ThemedText>
+              </View>
+              <ThemedText style={[styles.demoButtonEmail, { color: textSecondary }]}>manager@pharmacy.com</ThemedText>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.demoButton, { backgroundColor: '#10b981' + '20' }]}
-            onPress={() => {
-              setEmail('staff@pharmacy.com');
-              setPassword('staff123');
-            }}
-          >
-            <ThemedText style={styles.demoButtonText}>👤 Staff</ThemedText>
-            <ThemedText style={styles.demoButtonEmail}>staff@pharmacy.com</ThemedText>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity style={[styles.demoButton, { backgroundColor: '#10b98112', borderColor: '#10b98130' }]} onPress={() => { setEmail('staff@pharmacy.com'); setPassword('staff123'); }}>
+              <View style={styles.demoRow}>
+                <ThemedText style={[styles.demoButtonText, { color: colors.text }]}> Staff</ThemedText>
+                <ThemedText style={[styles.demoBadge, { color: '#10b981', backgroundColor: '#10b98120' }]}>Nhân viên</ThemedText>
+              </View>
+              <ThemedText style={[styles.demoButtonEmail, { color: textSecondary }]}>staff@pharmacy.com</ThemedText>
+            </TouchableOpacity>
+          </View>
 
-        {/* Sign Up Link */}
-        <View style={styles.footer}>
-          <ThemedText style={styles.footerText}>Chưa có tài khoản? </ThemedText>
-          <TouchableOpacity onPress={() => router.push('/register')}>
-            <ThemedText style={styles.signUpLink}>Đăng ký ngay</ThemedText>
-          </TouchableOpacity>
+          <View style={styles.footer}>
+            <ThemedText style={[styles.footerText, { color: textSecondary }]}>Chưa có tài khoản? </ThemedText>
+            <TouchableOpacity onPress={() => router.push('/register')}>
+              <ThemedText style={[styles.signUpLink, { color: colors.primary }]}>Đăng ký ngay</ThemedText>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </ThemedView>
@@ -195,70 +167,105 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingTop: 60,
+    paddingTop: 56,
     paddingBottom: 40,
   },
-  header: {
-    marginBottom: 40,
-    alignItems: 'center',
+  heroWrap: {
+    marginBottom: 24,
+  },
+  heroCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 10,
+  },
+  badge: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.4,
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontWeight: '700',
   },
   subtitle: {
     fontSize: 14,
-    opacity: 0.7,
+    opacity: 0.8,
+  },
+  heroChips: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  chip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  card: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    opacity: 0.8,
+    marginBottom: 18,
   },
   form: {
-    marginBottom: 30,
+    marginBottom: 14,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  input: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
+  inputText: {
+    paddingVertical: 0,
     fontSize: 14,
   },
   passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     position: 'relative',
   },
   passwordInput: {
-    flex: 1,
-    paddingRight: 40,
+    paddingRight: 42,
   },
   eyeButton: {
     position: 'absolute',
-    right: 12,
-    padding: 8,
-  },
-  inputError: {
-    borderColor: '#ef4444',
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 12,
-    marginTop: 6,
+    right: 10,
+    top: 12,
+    padding: 6,
   },
   loginButton: {
-    marginTop: 10,
+    marginTop: 4,
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    gap: 12,
+    marginBottom: 14,
+    gap: 10,
   },
   divider: {
     flex: 1,
@@ -267,42 +274,54 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontSize: 12,
-    opacity: 0.6,
+    opacity: 0.7,
   },
   demoContainer: {
-    marginBottom: 30,
+    gap: 10,
+    marginBottom: 12,
   },
   demoTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
+    fontWeight: '700',
   },
   demoButton: {
     padding: 12,
-    borderRadius: 8,
-    marginBottom: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  demoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  demoBadge: {
+    fontSize: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    fontWeight: '700',
   },
   demoButtonText: {
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 14,
     marginBottom: 4,
   },
   demoButtonEmail: {
     fontSize: 12,
-    opacity: 0.7,
+    opacity: 0.8,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 20,
+    marginTop: 10,
+    gap: 4,
   },
   footerText: {
-    fontSize: 14,
-    opacity: 0.7,
+    fontSize: 13,
+    opacity: 0.8,
   },
   signUpLink: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#3b82f6',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

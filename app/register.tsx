@@ -1,17 +1,13 @@
-import { useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, useColorScheme } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAuthStore } from '@/store/authStore';
-import { ThemedText } from '@/components/themed-text';
+﻿import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Colors } from '@/constants/Colors';
-import { 
-  validateEmail, 
-  validatePhoneVN, 
-  validateMedicineBasic 
-} from '@/utils/validators';
+import { useAuthStore } from '@/store/authStore';
+import { validateEmail, validatePhoneVN } from '@/utils/validators';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity, useColorScheme, View } from 'react-native';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -35,66 +31,40 @@ export default function RegisterScreen() {
 
   const isDark = colorScheme === 'dark';
   const colors = Colors[isDark ? 'dark' : 'light'];
+  const textSecondary = isDark ? '#cbd5e1' : '#5f6a7d';
+  const accentGreen = '#22c55e';
+  const accentOrange = '#f97316';
 
   const handleRegister = async () => {
     const newErrors: Record<string, string> = {};
 
-    // Validate Full Name
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = 'Tên không được để trống';
-    } else if (formData.fullName.trim().length < 3) {
-      newErrors.fullName = 'Tên phải có ít nhất 3 ký tự';
-    }
+    if (!formData.fullName.trim()) newErrors.fullName = 'Tên không được để trống';
+    else if (formData.fullName.trim().length < 3) newErrors.fullName = 'Tên phải có ít nhất 3 ký tự';
 
-    // Validate Email
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email không được để trống';
-    } else if (!validateEmail(formData.email)) {
-      newErrors.email = 'Email không hợp lệ';
-    }
+    if (!formData.email.trim()) newErrors.email = 'Email không được để trống';
+    else if (!validateEmail(formData.email)) newErrors.email = 'Email không hợp lệ';
 
-    // Validate Phone
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Số điện thoại không được để trống';
-    } else if (!validatePhoneVN(formData.phone)) {
-      newErrors.phone = 'Số điện thoại không hợp lệ (Việt Nam)';
-    }
+    if (!formData.phone.trim()) newErrors.phone = 'Số điện thoại không được để trống';
+    else if (!validatePhoneVN(formData.phone)) newErrors.phone = 'Số điện thoại không hợp lệ (Việt Nam)';
 
-    // Validate Pharmacy Name
-    if (!formData.pharmacyName.trim()) {
-      newErrors.pharmacyName = 'Tên nhà thuốc không được để trống';
-    } else if (formData.pharmacyName.trim().length < 3) {
-      newErrors.pharmacyName = 'Tên nhà thuốc phải có ít nhất 3 ký tự';
-    }
+    if (!formData.pharmacyName.trim()) newErrors.pharmacyName = 'Tên nhà thuốc không được để trống';
+    else if (formData.pharmacyName.trim().length < 3) newErrors.pharmacyName = 'Tên nhà thuốc phải có ít nhất 3 ký tự';
 
-    // Validate Address
-    if (!formData.address.trim()) {
-      newErrors.address = 'Địa chỉ không được để trống';
-    }
+    if (!formData.address.trim()) newErrors.address = 'Địa chỉ không được để trống';
 
-    // Validate Password
-    if (!formData.password) {
-      newErrors.password = 'Mật khẩu không được để trống';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
-    }
+    if (!formData.password) newErrors.password = 'Mật khẩu không được để trống';
+    else if (formData.password.length < 6) newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
 
-    // Validate Confirm Password
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = 'Xác nhận mật khẩu không được để trống';
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Mật khẩu không khớp';
-    }
+    if (!formData.confirmPassword) newErrors.confirmPassword = 'Xác nhận mật khẩu không được để trống';
+    else if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Mật khẩu không khớp';
 
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length === 0) {
       setIsLoading(true);
       try {
-        // Gọi hàm register từ store
         const success = await register(formData);
         if (success) {
-          alert('✅ Đăng ký thành công! Vui lòng đăng nhập');
           router.replace('/login');
         } else {
           setErrors({ email: 'Email này đã được đăng ký' });
@@ -108,212 +78,149 @@ export default function RegisterScreen() {
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
-    // Clear error for this field when user starts typing
+    setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
+      const updated = { ...errors };
+      delete updated[field];
+      setErrors(updated);
     }
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <ThemedText style={styles.backButton}>← Quay lại</ThemedText>
-          </TouchableOpacity>
-          <ThemedText style={styles.title}>Đăng Ký Tài Khoản</ThemedText>
-          <ThemedText style={styles.subtitle}>
-            Quản lý cửa hàng bán thuốc của bạn
-          </ThemedText>
+    <ThemedView style={[styles.container, { backgroundColor: colors.background }]}> 
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroWrap}>
+          <View style={[styles.heroCard, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}25` }]}> 
+            <ThemedText style={[styles.badge, { color: colors.primary, borderColor: `${colors.primary}40` }]}>Thiết lập trong 1 phút</ThemedText>
+            <ThemedText style={[styles.title, { color: colors.text }]}>Tạo tài khoản nhà thuốc</ThemedText>
+            <ThemedText style={[styles.subtitle, { color: textSecondary }]}>Đồng bộ bán hàng, kho, báo cáo trên một nền tảng.</ThemedText>
+            <View style={styles.heroChips}>
+              <View style={[styles.chip, { backgroundColor: `${colors.primary}15` }]}><ThemedText style={[styles.chipText, { color: colors.primary }]}>POS</ThemedText></View>
+              <View style={[styles.chip, { backgroundColor: `${accentGreen}20` }]}><ThemedText style={[styles.chipText, { color: accentGreen }]}>Kho</ThemedText></View>
+              <View style={[styles.chip, { backgroundColor: `${accentOrange}20` }]}><ThemedText style={[styles.chipText, { color: accentOrange }]}>Báo cáo</ThemedText></View>
+            </View>
+          </View>
         </View>
 
-        {/* Form */}
-        <View style={styles.form}>
-          {/* Full Name */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Họ và tên</ThemedText>
-            <Input
-              placeholder="Nguyễn Văn A"
-              value={formData.fullName}
-              onChangeText={(value) => handleInputChange('fullName', value)}
-              editable={!isLoading}
-              style={[
-                styles.input,
-                errors.fullName && styles.inputError,
-                { borderColor: errors.fullName ? '#ef4444' : colors.border },
-              ]}
-            />
-            {errors.fullName && (
-              <ThemedText style={styles.errorText}>{errors.fullName}</ThemedText>
-            )}
-          </View>
+        <View style={[styles.card, { backgroundColor: colors.card ?? colors.backgroundCard ?? '#fff', borderColor: colors.border }]}> 
+          <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Đăng ký tài khoản</ThemedText>
+          <ThemedText style={[styles.cardSubtitle, { color: textSecondary }]}>Nhập thông tin để kích hoạt không gian quản lý của bạn.</ThemedText>
 
-          {/* Email */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Email</ThemedText>
-            <Input
-              placeholder="nhap@email.com"
-              value={formData.email}
-              onChangeText={(value) => handleInputChange('email', value)}
-              keyboardType="email-address"
-              editable={!isLoading}
-              style={[
-                styles.input,
-                errors.email && styles.inputError,
-                { borderColor: errors.email ? '#ef4444' : colors.border },
-              ]}
-            />
-            {errors.email && (
-              <ThemedText style={styles.errorText}>{errors.email}</ThemedText>
-            )}
-          </View>
-
-          {/* Phone */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Số điện thoại</ThemedText>
-            <Input
-              placeholder="0901234567"
-              value={formData.phone}
-              onChangeText={(value) => handleInputChange('phone', value)}
-              keyboardType="phone-pad"
-              editable={!isLoading}
-              style={[
-                styles.input,
-                errors.phone && styles.inputError,
-                { borderColor: errors.phone ? '#ef4444' : colors.border },
-              ]}
-            />
-            {errors.phone && (
-              <ThemedText style={styles.errorText}>{errors.phone}</ThemedText>
-            )}
-          </View>
-
-          {/* Pharmacy Name */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Tên nhà thuốc</ThemedText>
-            <Input
-              placeholder="Nhà thuốc Thép Phương"
-              value={formData.pharmacyName}
-              onChangeText={(value) => handleInputChange('pharmacyName', value)}
-              editable={!isLoading}
-              style={[
-                styles.input,
-                errors.pharmacyName && styles.inputError,
-                { borderColor: errors.pharmacyName ? '#ef4444' : colors.border },
-              ]}
-            />
-            {errors.pharmacyName && (
-              <ThemedText style={styles.errorText}>{errors.pharmacyName}</ThemedText>
-            )}
-          </View>
-
-          {/* Address */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Địa chỉ</ThemedText>
-            <Input
-              placeholder="123 Đường ABC, Quận XYZ, TP HCM"
-              value={formData.address}
-              onChangeText={(value) => handleInputChange('address', value)}
-              editable={!isLoading}
-              multiline
-              numberOfLines={3}
-              style={[
-                styles.input,
-                styles.addressInput,
-                errors.address && styles.inputError,
-                { borderColor: errors.address ? '#ef4444' : colors.border },
-              ]}
-            />
-            {errors.address && (
-              <ThemedText style={styles.errorText}>{errors.address}</ThemedText>
-            )}
-          </View>
-
-          {/* Password */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Mật khẩu</ThemedText>
-            <View style={styles.passwordContainer}>
+          <View style={styles.form}>
+            <View style={styles.inputGroup}>
+              <ThemedText style={[styles.label, { color: textSecondary }]}>Họ và tên</ThemedText>
               <Input
-                placeholder="••••••"
-                value={formData.password}
-                onChangeText={(value) => handleInputChange('password', value)}
-                secureTextEntry={!showPassword}
+                placeholder="Nguyễn Văn A"
+                value={formData.fullName}
+                onChangeText={(v) => handleInputChange('fullName', v)}
                 editable={!isLoading}
-                style={[
-                  styles.input,
-                  styles.passwordInput,
-                  errors.password && styles.inputError,
-                  { borderColor: errors.password ? '#ef4444' : colors.border },
-                ]}
+                style={styles.inputText}
+                error={errors.fullName}
               />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
-              >
-                <ThemedText>{showPassword ? '👁️' : '👁️‍🗨️'}</ThemedText>
-              </TouchableOpacity>
             </View>
-            {errors.password && (
-              <ThemedText style={styles.errorText}>{errors.password}</ThemedText>
-            )}
-          </View>
 
-          {/* Confirm Password */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Xác nhận mật khẩu</ThemedText>
-            <View style={styles.passwordContainer}>
+            <View style={styles.inputGroup}>
+              <ThemedText style={[styles.label, { color: textSecondary }]}>Email</ThemedText>
               <Input
-                placeholder="••••••"
-                value={formData.confirmPassword}
-                onChangeText={(value) => handleInputChange('confirmPassword', value)}
-                secureTextEntry={!showConfirmPassword}
+                placeholder="nhap@email.com"
+                value={formData.email}
+                onChangeText={(v) => handleInputChange('email', v)}
+                keyboardType="email-address"
                 editable={!isLoading}
-                style={[
-                  styles.input,
-                  styles.passwordInput,
-                  errors.confirmPassword && styles.inputError,
-                  { borderColor: errors.confirmPassword ? '#ef4444' : colors.border },
-                ]}
+                style={styles.inputText}
+                error={errors.email}
               />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-              >
-                <ThemedText>{showConfirmPassword ? '👁️' : '👁️‍🗨️'}</ThemedText>
-              </TouchableOpacity>
             </View>
-            {errors.confirmPassword && (
-              <ThemedText style={styles.errorText}>{errors.confirmPassword}</ThemedText>
-            )}
+
+            <View style={styles.inputGroup}>
+              <ThemedText style={[styles.label, { color: textSecondary }]}>Số điện thoại</ThemedText>
+              <Input
+                placeholder="0901234567"
+                value={formData.phone}
+                onChangeText={(v) => handleInputChange('phone', v)}
+                keyboardType="phone-pad"
+                editable={!isLoading}
+                style={styles.inputText}
+                error={errors.phone}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <ThemedText style={[styles.label, { color: textSecondary }]}>Tên nhà thuốc</ThemedText>
+              <Input
+                placeholder="Nhà thuốc ABC"
+                value={formData.pharmacyName}
+                onChangeText={(v) => handleInputChange('pharmacyName', v)}
+                editable={!isLoading}
+                style={styles.inputText}
+                error={errors.pharmacyName}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <ThemedText style={[styles.label, { color: textSecondary }]}>Địa chỉ</ThemedText>
+              <Input
+                placeholder="123 Đường ABC, Quận XYZ, TP.HCM"
+                value={formData.address}
+                onChangeText={(v) => handleInputChange('address', v)}
+                editable={!isLoading}
+                multiline
+                numberOfLines={3}
+                style={[styles.inputText, styles.textArea]}
+                error={errors.address}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <ThemedText style={[styles.label, { color: textSecondary }]}>Mật khẩu</ThemedText>
+              <View style={styles.passwordWrapper}>
+                <Input
+                  placeholder="••••••"
+                  value={formData.password}
+                  onChangeText={(v) => handleInputChange('password', v)}
+                  secureTextEntry={!showPassword}
+                  editable={!isLoading}
+                  style={[styles.inputText, styles.passwordInput]}
+                  error={errors.password}
+                />
+                <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPassword(!showPassword)}>
+                  <ThemedText>{showPassword ? '🙈' : '👁'}</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <ThemedText style={[styles.label, { color: textSecondary }]}>Xác nhận mật khẩu</ThemedText>
+              <View style={styles.passwordWrapper}>
+                <Input
+                  placeholder="••••••"
+                  value={formData.confirmPassword}
+                  onChangeText={(v) => handleInputChange('confirmPassword', v)}
+                  secureTextEntry={!showConfirmPassword}
+                  editable={!isLoading}
+                  style={[styles.inputText, styles.passwordInput]}
+                  error={errors.confirmPassword}
+                />
+                <TouchableOpacity style={styles.eyeButton} onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                  <ThemedText>{showConfirmPassword ? '🙈' : '👁'}</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <Button
+              title={isLoading ? 'Đang tạo tài khoản...' : 'Tạo tài khoản'}
+              onPress={handleRegister}
+              disabled={isLoading}
+              style={styles.submitButton}
+            />
           </View>
 
-          {/* Register Button */}
-          <Button
-            title={isLoading ? 'Đang đăng ký...' : 'Đăng Ký'}
-            onPress={handleRegister}
-            disabled={isLoading}
-            style={styles.registerButton}
-          />
-        </View>
-
-        {/* Back to Login */}
-        <View style={styles.footer}>
-          <ThemedText style={styles.footerText}>Đã có tài khoản? </ThemedText>
-          <TouchableOpacity onPress={() => router.replace('/login')}>
-            <ThemedText style={styles.loginLink}>Đăng nhập ngay</ThemedText>
-          </TouchableOpacity>
+          <View style={styles.footer}>
+            <ThemedText style={[styles.footerText, { color: textSecondary }]}>Đã có tài khoản? </ThemedText>
+            <TouchableOpacity onPress={() => router.replace('/login')}>
+              <ThemedText style={[styles.signInLink, { color: colors.primary }]}>Đăng nhập</ThemedText>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </ThemedView>
@@ -321,90 +228,48 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingTop: 40,
-    paddingBottom: 40,
-  },
-  header: {
-    marginBottom: 30,
-  },
-  backButton: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#3b82f6',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  form: {
-    marginBottom: 30,
-  },
-  inputGroup: {
-    marginBottom: 18,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  input: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
+  container: { flex: 1 },
+  scrollContent: { padding: 20, paddingTop: 56, paddingBottom: 40 },
+  heroWrap: { marginBottom: 24 },
+  heroCard: { padding: 20, borderRadius: 16, borderWidth: 1, gap: 10 },
+  badge: {
+    alignSelf: 'flex-start',
     borderWidth: 1,
-    fontSize: 14,
-  },
-  addressInput: {
-    paddingVertical: 30,
-    textAlignVertical: 'top',
-  },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  passwordInput: {
-    flex: 1,
-    paddingRight: 40,
-  },
-  eyeButton: {
-    position: 'absolute',
-    right: 12,
-    padding: 8,
-  },
-  inputError: {
-    borderColor: '#ef4444',
-  },
-  errorText: {
-    color: '#ef4444',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
     fontSize: 12,
-    marginTop: 6,
-  },
-  registerButton: {
-    marginTop: 10,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  footerText: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  loginLink: {
-    fontSize: 14,
     fontWeight: '600',
-    color: '#3b82f6',
+    letterSpacing: 0.4,
   },
+  title: { fontSize: 26, fontWeight: '700' },
+  subtitle: { fontSize: 14, opacity: 0.8 },
+  heroChips: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  chipText: { fontSize: 12, fontWeight: '600' },
+  card: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+    gap: 10,
+  },
+  cardTitle: { fontSize: 20, fontWeight: '700' },
+  cardSubtitle: { fontSize: 14, opacity: 0.8, marginBottom: 8 },
+  form: { gap: 14 },
+  inputGroup: { gap: 8 },
+  label: { fontSize: 13, fontWeight: '600' },
+  inputText: { fontSize: 14, paddingVertical: 0 },
+  textArea: { height: 96, textAlignVertical: 'top' },
+  passwordWrapper: { position: 'relative' },
+  passwordInput: { paddingRight: 42 },
+  eyeButton: { position: 'absolute', right: 10, top: 12, padding: 6 },
+  submitButton: { marginTop: 6 },
+  footer: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 4 },
+  footerText: { fontSize: 13, opacity: 0.8 },
+  signInLink: { fontSize: 13, fontWeight: '700' },
 });

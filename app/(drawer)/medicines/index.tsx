@@ -1,17 +1,23 @@
+import { useTheme } from '@/context/ThemeContext';
 import { dataManager } from '@/services/DataManager';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { DrawerActions } from '@react-navigation/native';
+import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useTheme } from '@/context/ThemeContext';
 
 export default function MedicinesScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { colors, isDark } = useTheme();
   const [medicines, setMedicines] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredMedicines, setFilteredMedicines] = useState<any[]>([]);
+
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
 
   // Định nghĩa các màu semantic
   const SEMANTIC = {
@@ -263,10 +269,17 @@ export default function MedicinesScreen() {
       {/* --- HEADER --- */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.headerTitle}>Danh sách thuốc</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+            {Platform.OS !== 'web' && (
+              <TouchableOpacity onPress={openDrawer} style={{padding: 4}}>
+                <MaterialIcons name="menu" size={28} color={colors.text} />
+              </TouchableOpacity>
+            )}
+            <Text style={styles.headerTitle}>Danh sách thuốc</Text>
+          </View>
           <TouchableOpacity 
             style={styles.addButton} 
-            onPress={() => router.push('/medicines/add' as any)}
+            onPress={() => router.push('/medicines/import' as any)}
             activeOpacity={0.8}
           >
             <MaterialIcons name="add" size={24} color={colors.card} />

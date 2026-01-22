@@ -2,7 +2,7 @@ import { dataManager } from '@/services/DataManager';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View, Alert, Modal, TextInput } from 'react-native';
+import { Alert, FlatList, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const THEME = {
@@ -25,12 +25,14 @@ export default function LowStockScreen() {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [importQty, setImportQty] = useState('');
   const [importPrice, setImportPrice] = useState('');
+  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
 
   const loadData = () => {
     const all = dataManager.getAllMedicines();
     const low = all.filter(item => {
       const total = item.batches ? item.batches.reduce((sum:number, b:any) => sum + b.quantity, 0) : 0;
-      return total <= 10; 
+      const threshold = typeof item.minStock === 'number' ? item.minStock : 10;
+      return total <= threshold; 
     });
     setLowStockList(low);
   };
@@ -79,6 +81,7 @@ export default function LowStockScreen() {
   const renderItem = ({ item, index }: { item: any; index: number }) => {
     const totalStock = item.batches ? item.batches.reduce((sum:number, b:any) => sum + b.quantity, 0) : 0;
     const isOut = totalStock === 0;
+    const showImage = item.image && !failedImages[item.id];
 
     return (
       <Animated.View entering={FadeInDown.delay(index * 50).duration(400)}>
@@ -88,8 +91,17 @@ export default function LowStockScreen() {
             onPress={() => router.push(`/medicines/${item.id}` as any)}
           >
             <View style={styles.cardLeft}>
-              <View style={styles.iconBox}>
-                 <MaterialIcons name="inventory-2" size={24} color={THEME.orange} />
+              <View style={styles.thumbBox}>
+                {showImage ? (
+                  <Image 
+                    source={{ uri: item.image }} 
+                    style={styles.thumbImage}
+                    resizeMode="cover"
+                    onError={() => setFailedImages(prev => ({ ...prev, [item.id]: true }))}
+                  />
+                ) : (
+                  <MaterialIcons name="inventory-2" size={24} color={THEME.orange} />
+                )}
               </View>
               <View>
                  <Text style={styles.medName}>{item.name}</Text>
@@ -133,7 +145,7 @@ export default function LowStockScreen() {
 
       <View style={styles.summaryBox}>
         <Text style={styles.summaryText}>
-          Có <Text style={{fontWeight: 'bold', color: THEME.orange}}>{lowStockList.length}</Text> thuốc dưới định mức tồn kho (≤ 10).
+          Có <Text style={{fontWeight: 'bold', color: THEME.orange}}>{lowStockList.length}</Text> thuốc dưới định mức tồn kho.
         </Text>
       </View>
 
@@ -224,10 +236,11 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   cardLeft: { flexDirection: 'row', gap: 12, alignItems: 'center' },
-  iconBox: { 
-    width: 48, height: 48, borderRadius: 8, backgroundColor: THEME.orangeBg, 
-    alignItems: 'center', justifyContent: 'center' 
+  thumbBox: { 
+    width: 56, height: 56, borderRadius: 12, backgroundColor: THEME.orangeBg, 
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: THEME.border 
   },
+  thumbImage: { width: '100%', height: '100%' },
   medName: { fontSize: 16, fontWeight: '600', color: THEME.text },
   medUnit: { fontSize: 13, color: THEME.textGray },
   

@@ -4,9 +4,9 @@
  */
 
 import { API_ENDPOINTS } from '@/constants/config';
-import { Medicine } from '@/types/medicine';
-import { Invoice, PurchaseOrder } from '@/types/invoice';
 import { Customer } from '@/types/customer';
+import { Invoice } from '@/types/invoice';
+import { Medicine } from '@/types/medicine';
 
 // ===== API CLIENT =====
 class ApiClient {
@@ -126,7 +126,8 @@ class ApiClient {
    * Get auth headers (JWT token, etc.)
    */
   private getAuthHeaders(): Record<string, string> {
-    const token = localStorage.getItem('auth_token');
+    const hasStorage = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+    const token = hasStorage ? localStorage.getItem('auth_token') : null;
     if (token) {
       return { Authorization: `Bearer ${token}` };
     }
@@ -137,14 +138,18 @@ class ApiClient {
    * Set auth token
    */
   setAuthToken(token: string): void {
-    localStorage.setItem('auth_token', token);
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      localStorage.setItem('auth_token', token);
+    }
   }
 
   /**
    * Clear auth token
    */
   clearAuthToken(): void {
-    localStorage.removeItem('auth_token');
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      localStorage.removeItem('auth_token');
+    }
   }
 }
 

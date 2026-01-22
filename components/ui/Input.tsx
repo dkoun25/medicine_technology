@@ -12,20 +12,26 @@ type InputProps = TextInputProps & {
 export function Input({ label, error, icon, containerStyle, style, ...props }: InputProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const isMultiline = Boolean(props.multiline);
 
   return (
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={[styles.label, { color: colors.text }]}>{label}</Text>}
-      <View style={[
-        styles.inputContainer, 
-        { 
-          backgroundColor: colors.background, 
-          borderColor: error ? colors.danger : colors.border 
-        }
-      ]}>
+      <View
+        style={[
+          styles.inputContainer,
+          {
+            backgroundColor: colors.background,
+            borderColor: error ? colors.danger : colors.border,
+            alignItems: isMultiline ? 'flex-start' : 'center',
+            paddingVertical: isMultiline ? Spacing.sm : 0,
+          },
+          isMultiline && styles.multilineContainer,
+        ]}
+      >
         {icon && <Text style={styles.icon}>{icon}</Text>}
         <TextInput
-          style={[styles.input, { color: colors.text }, style]}
+          style={[styles.input, { color: colors.text }, isMultiline && styles.multilineInput, style]}
           placeholderTextColor={colors.textSecondary}
           {...props}
         />
@@ -50,7 +56,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.sm,
-    height: 44,
+    minHeight: 44,
   },
   icon: {
     fontSize: 18,
@@ -60,6 +66,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: FontSizes.md,
     paddingVertical: 0,
+  },
+  multilineContainer: {
+    width: '100%',
+  },
+  multilineInput: {
+    textAlignVertical: 'top',
   },
   error: {
     fontSize: FontSizes.xs,

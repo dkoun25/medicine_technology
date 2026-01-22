@@ -1,18 +1,19 @@
 import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { dataManager } from '@/services/DataManager';
+import { useAuthStore } from '@/store/authStore';
 import { DrawerContentComponentProps, DrawerContentScrollView } from '@react-navigation/drawer';
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
-  FadeIn,
-  FadeInDown,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    FadeIn,
+    FadeInDown,
+    interpolate,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from 'react-native-reanimated';
-import { dataManager } from '@/services/DataManager';
 
 // --- ĐỊNH NGHĨA KIỂU DỮ LIỆU ---
 type MenuItem = {
@@ -176,6 +177,7 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
   const router = useRouter();
   const pathname = usePathname();
   const colorScheme = useColorScheme() ?? 'light';
+  const { user, logout } = useAuthStore();
   
   const [expiringCount, setExpiringCount] = useState(0);
   const [lowStockCount, setLowStockCount] = useState(0);
@@ -224,6 +226,28 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
     router.push(route as any); 
   };
 
+  const handleProfileClick = () => {
+    router.push('/system/settings' as any);
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Đăng xuất',
+      'Bạn có chắc chắn muốn đăng xuất?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Đăng xuất',
+          style: 'destructive',
+          onPress: () => {
+            logout();
+            router.replace('/login' as any);
+          },
+        },
+      ]
+    );
+  };
+
   const getBadgeColors = (type: string = 'info') => {
     switch (type) {
       case 'success': return { bg: `${colors.green}20`, text: colors.green };
@@ -266,15 +290,31 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
         entering={FadeInDown.delay(800).duration(400)}
         style={[styles.footer, { borderTopColor: colors.borderLight }]}
       >
-        <TouchableOpacity style={[styles.profileContainer, { backgroundColor: `${colors.border}20` }]} activeOpacity={0.7}>
+        <TouchableOpacity 
+          style={[styles.profileContainer, { backgroundColor: `${colors.border}20` }]} 
+          activeOpacity={0.7}
+          onPress={handleProfileClick}
+        >
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>AD</Text>
+            <Text style={styles.avatarText}>
+              {user?.name?.substring(0, 2).toUpperCase() || 'AD'}
+            </Text>
           </View>
           <View style={styles.profileText}>
-            <Text style={[styles.profileName, { color: colors.text }]}>Admin User</Text>
-            <Text style={[styles.profileRole, { color: colors.textSecondary }]}>Quản lý cấp cao</Text>
+            <Text style={[styles.profileName, { color: colors.text }]}>
+              {user?.name || 'Admin User'}
+            </Text>
+            <Text style={[styles.profileRole, { color: colors.textSecondary }]}>
+              {user?.role === 'admin' ? 'Quản lý cấp cao' : user?.role === 'manager' ? 'Quản lý' : 'Nhân viên'}
+            </Text>
           </View>
-          <TouchableOpacity style={styles.logoutButton}>
+          <TouchableOpacity 
+            style={styles.logoutButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleLogout();
+            }}
+          >
              <Text style={{ fontSize: 18 }}>🚪</Text>
           </TouchableOpacity>
         </TouchableOpacity>
