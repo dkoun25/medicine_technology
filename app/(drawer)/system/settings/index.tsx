@@ -2,13 +2,13 @@ import { useTheme } from '@/context/ThemeContext'; // Import context
 import { dataManager } from '@/services/DataManager';
 import { useAuthStore } from '@/store/authStore';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DrawerActions } from '@react-navigation/native';
 import { useNavigation, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
@@ -27,9 +27,9 @@ export default function SettingsScreen() {
   // 2. Lấy state từ DataManager
   const [settings, setSettings] = useState(dataManager.getSettings());
   const [isEditingShop, setIsEditingShop] = useState(false);
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
   const isEditing = isEditingShop || isEditingAddress;
   const [tempShopName, setTempShopName] = useState(settings.shopName);
-  const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [tempShopAddress, setTempShopAddress] = useState(settings.shopAddress);
 
   const updateSetting = (key: string, value: any) => {

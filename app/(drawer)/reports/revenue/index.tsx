@@ -1,13 +1,13 @@
 import { useInvoices } from '@/hooks/useInvoices';
+import { useMedicineStore } from '@/store/medicineStore';
 import { Invoice } from '@/types/invoice';
 import { PurchaseOrder, getTotalStock } from '@/types/medicine';
-import { useMedicineStore } from '@/store/medicineStore';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DrawerActions, useFocusEffect } from '@react-navigation/native';
 import { useNavigation } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions, Modal } from 'react-native';
+import { Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -547,7 +547,6 @@ export default function RevenueScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: THEME.bg },
   header: { backgroundColor: THEME.white, padding: 16, paddingTop: Platform.OS === 'web' ? 20 : 50, borderBottomWidth: 1, borderColor: THEME.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: THEME.text },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: THEME.text, letterSpacing: 0.2 },
   statsRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
   statCard: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: THEME.white, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },

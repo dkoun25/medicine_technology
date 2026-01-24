@@ -76,7 +76,7 @@ export default function LoginScreen() {
           </View>
         </View>
 
-        <View style={[styles.card, { backgroundColor: colors.card ?? colors.backgroundCard ?? '#fff', borderColor: colors.border }]}>
+        <View style={[styles.card, { backgroundColor: colors.card ?? '#fff', borderColor: colors.border }]}>
           <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Đăng nhập</ThemedText>
           <ThemedText style={[styles.cardSubtitle, { color: textSecondary }]}>Dùng tài khoản demo hoặc email của bạn.</ThemedText>
 

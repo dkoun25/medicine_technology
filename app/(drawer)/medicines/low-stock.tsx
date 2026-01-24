@@ -350,6 +350,6 @@ const styles = StyleSheet.create({
 
   // Suggestion rows
   suggestRow: { flexDirection: 'row', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: THEME.border },
-  suggestBadge: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: THEME.blueBg, borderRadius: 8, justifyContent: 'center' },
+  suggestBadge: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: THEME.primary, borderRadius: 8, justifyContent: 'center' },
   suggestText: { color: THEME.primary, fontWeight: '700' },
 });
