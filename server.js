@@ -9,10 +9,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Serve static files
-app.use(express.static(path.join(__dirname, "web-build")));
+app.use(express.static("dist"));
 
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "web-build", "index.html"));
+  res.sendFile("dist/index.html", { root: process.cwd() });
 });
 
 app.listen(PORT, "0.0.0.0", () => {
